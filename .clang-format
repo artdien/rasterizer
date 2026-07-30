@@ -1,0 +1,13 @@
+---
+BasedOnStyle: LLVM
+ColumnLimit: 160
+PointerAlignment: Left
+DerivePointerAlignment: false
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortEnumsOnASingleLine: false
+SortIncludes: CaseInsensitive
+SpaceBeforeCpp11BracedList: true
+AlwaysBreakTemplateDeclarations: Yes
+IndentRequiresClause: false
+IndentCaseLabels: true
+IndentPPDirectives: BeforeHash
