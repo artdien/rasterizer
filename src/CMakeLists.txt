@@ -16,5 +16,6 @@ target_include_directories(
 target_sources(
   rasterizer
   PRIVATE
+    utils/cli.cpp
     main.cpp
 )
