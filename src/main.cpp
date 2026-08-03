@@ -1,6 +1,7 @@
 #include <print>
 
 #include "model/loading.hpp"
+#include "platform/types.hpp"
 #include "utils/cli.hpp"
 
 using namespace rasterizer::utils;

@@ -1,14 +1,22 @@
 #include "model/loading.hpp"
 
 #include <algorithm>
+#include <cstddef>
+#include <format>
+#include <iterator>
+#include <memory>
 #include <print>
 #include <ranges>
+#include <stdexcept>
+#include <utility>
 #include <variant>
+#include <vector>
 
 #include <fastgltf/core.hpp>
 #include <fastgltf/glm_element_traits.hpp>
 #include <stb_image.h>
 
+#include "model/material.hpp"
 #include "platform/types.hpp"
 
 namespace rasterizer::model {

@@ -1,5 +1,11 @@
 #include "utils/cli.hpp"
 
+#include <algorithm>
+#include <charconv>
+#include <ranges>
+#include <span>
+#include <system_error>
+
 namespace rasterizer::utils {
 
 auto parse_cli_argument_str(i32 argc, c8* argv[], std::string_view argument) -> std::optional<std::string> {
