@@ -42,11 +42,11 @@ public:
   /// Modifications made to internal framebuffer will immediately be visible.
   ///
   /// @return Modifiable view of internal framebuffer.
-  auto buffer() -> buffer::FramebufferView;
+  auto buffer() -> buffer::FramebufferView<u32>;
 
 private:
   std::string title_;
-  buffer::Framebuffer buffer_;
+  buffer::Framebuffer<u32> buffer_;
 };
 
 } // namespace rasterizer::platform

@@ -43,7 +43,7 @@ auto Window::close() -> void {
   window_opened = false;
 }
 
-auto Window::buffer() -> buffer::FramebufferView {
+auto Window::buffer() -> buffer::FramebufferView<u32> {
   return buffer_.view();
 }
 

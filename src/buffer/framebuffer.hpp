@@ -6,6 +6,7 @@
 
 namespace rasterizer::buffer {
 
+template <typename T>
 struct FramebufferView {
   /// @brief Constructs a view into an existing framebuffer.
   ///
@@ -15,9 +16,9 @@ struct FramebufferView {
   /// @param width  Width of the buffer.
   /// @param height Height of the buffer.
   /// @param buffer Pointer to the raw buffer data.
-  FramebufferView(u32 width, u32 height, u32* buffer) : width {width}, height {height}, buffer_ {buffer} {};
+  FramebufferView(u32 width, u32 height, T* buffer) : width {width}, height {height}, buffer_ {buffer} {};
 
-  /// @brief Returns a reference to the pixel at coordinates (x, y).
+  /// @brief Returns a reference to the value at coordinates (x, y).
   ///
   /// The coordinate system is bottom-up:
   /// (0, 0) corresponds to the bottom-left corner of the buffer.
@@ -28,7 +29,7 @@ struct FramebufferView {
     return buffer_[x + (height - (y + 1)) * width];
   }
 
-  /// @brief Returns a constant reference to the pixel at coordinates (x, y).
+  /// @brief Returns a constant reference to the value at coordinates (x, y).
   ///
   /// The coordinate system is bottom-up:
   /// (0, 0) corresponds to the bottom-left corner of the buffer.
@@ -43,9 +44,10 @@ struct FramebufferView {
   u32 height;
 
 private:
-  u32* buffer_;
+  T* buffer_;
 };
 
+template <typename T>
 class Framebuffer {
 public:
   /// @brief Constructs a framebuffer with the specified dimensions.
@@ -65,17 +67,17 @@ public:
   /// @brief Creates and returns a view of the framebuffer.
   ///
   /// @return Modifiable view of framebuffer.
-  auto view() -> FramebufferView;
+  auto view() -> FramebufferView<T>;
 
   /// @brief Fills the entire framebuffer with a specific value.
   ///
-  /// @param value The value to fill the buffer with (defaults to 0).
-  auto clear(u32 value = 0u) -> void;
+  /// @param value The value to fill the buffer with.
+  auto clear(T value = T {}) -> void;
 
 private:
   u32 width_;
   u32 height_;
-  std::unique_ptr<u32[]> buffer_;
+  std::unique_ptr<T[]> buffer_;
 };
 
 } // namespace rasterizer::buffer

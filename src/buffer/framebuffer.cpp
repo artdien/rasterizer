@@ -2,16 +2,22 @@
 
 namespace rasterizer::buffer {
 
-Framebuffer::Framebuffer(u32 width, u32 height) : width_ {width}, height_ {height}, buffer_ {std::make_unique<u32[]>(width * height)} {
+template <typename T>
+Framebuffer<T>::Framebuffer(u32 width, u32 height) : width_ {width}, height_ {height}, buffer_ {std::make_unique<T[]>(width * height)} {
   clear();
 }
 
-auto Framebuffer::view() -> FramebufferView {
+template <typename T>
+auto Framebuffer<T>::view() -> FramebufferView<T> {
   return FramebufferView(width_, height_, buffer_.get());
 }
 
-auto Framebuffer::clear(u32 value) -> void {
+template <typename T>
+auto Framebuffer<T>::clear(T value) -> void {
   std::fill_n(buffer_.get(), width_ * height_, value);
 }
+
+template class Framebuffer<u32>;
+template struct FramebufferView<u32>;
 
 } // namespace rasterizer::buffer
