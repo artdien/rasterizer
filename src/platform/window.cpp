@@ -18,9 +18,9 @@ auto Window::open(std::function<void(f64)> execute_per_frame) -> void {
   auto view {buffer_.view()};
   auto window {fenster {
       .title = title_.c_str(),
-      .width = static_cast<i32>(view.width),
-      .height = static_cast<i32>(view.height),
-      .buf = &view.at(0, view.height - 1),
+      .width = static_cast<i32>(view.width()),
+      .height = static_cast<i32>(view.height()),
+      .buf = &view.at(0, view.height() - 1),
   }};
 
   fenster_open(&window);

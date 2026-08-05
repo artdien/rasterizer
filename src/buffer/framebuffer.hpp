@@ -16,7 +16,7 @@ struct FramebufferView {
   /// @param width  Width of the buffer.
   /// @param height Height of the buffer.
   /// @param buffer Pointer to the raw buffer data.
-  FramebufferView(u32 width, u32 height, T* buffer) : width {width}, height {height}, buffer_ {buffer} {};
+  FramebufferView(u32 width, u32 height, T* buffer) : width_ {width}, height_ {height}, buffer_ {buffer} {};
 
   /// @brief Returns a reference to the value at coordinates (x, y).
   ///
@@ -26,7 +26,7 @@ struct FramebufferView {
   /// @param x X-coordinate (column).
   /// @param y Y-coordinate (row).
   auto at(u32 x, u32 y) -> u32& {
-    return buffer_[x + (height - (y + 1)) * width];
+    return buffer_[x + (height_ - (y + 1)) * width_];
   }
 
   /// @brief Returns a constant reference to the value at coordinates (x, y).
@@ -37,13 +37,22 @@ struct FramebufferView {
   /// @param x X-coordinate (column).
   /// @param y Y-coordinate (row).
   auto at(u32 x, u32 y) const -> const u32& {
-    return buffer_[x + (height - (y + 1)) * width];
+    return buffer_[x + (height_ - (y + 1)) * width_];
   }
 
-  u32 width;
-  u32 height;
+  /// @brief Returns width of framebuffer.
+  auto width() -> u32 {
+    return width_;
+  }
+
+  /// @brief Returns height of framebuffer.
+  auto height() -> u32 {
+    return height_;
+  }
 
 private:
+  u32 width_;
+  u32 height_;
   T* buffer_;
 };
 
