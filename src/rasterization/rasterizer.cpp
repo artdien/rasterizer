@@ -169,29 +169,29 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
 
   // -- Calculate Edge Functions --
 
-  const auto E1 {M[0]};
-  const auto E2 {M[1]};
-  const auto E3 {M[2]};
+  const auto E0 {M[0]};
+  const auto E1 {M[1]};
+  const auto E2 {M[2]};
 
   // -- Rasterize Triangle --
 
   for (auto y {y_min}; y < y_max; ++y) {
     for (auto x {x_min}; x < x_max; ++x) {
       const glm::vec3 p {(static_cast<f32>(x) + 0.5f), (static_cast<f32>(y) + 0.5f), 1.0f};
+      auto e0 {glm::dot(E0, p)};
       auto e1 {glm::dot(E1, p)};
       auto e2 {glm::dot(E2, p)};
-      auto e3 {glm::dot(E3, p)};
 
-      if (e1 >= 0 && e2 >= 0 && e3 >= 0) {
+      if (e0 >= 0 && e1 >= 0 && e2 >= 0) {
         // Coefficients for perspective-correct interpolation
-        const auto r {1.0f / (e1 + e2 + e3)};
+        const auto r {1.0f / (e0 + e1 + e2)};
+        const auto f0 {r * e0};
         const auto f1 {r * e1};
         const auto f2 {r * e2};
-        const auto f3 {r * e3};
 
-        if (auto z {f1 * p0.z + f2 * p1.z + f3 * p2.z}; z < depth.at(x, y)) {
-          const auto u {f1 * v0.uv.s + f2 * v1.uv.s + f3 * v2.uv.s};
-          const auto v {f1 * v0.uv.t + f2 * v1.uv.t + f3 * v2.uv.t};
+        if (auto z {f0 * p0.z + f1 * p1.z + f2 * p2.z}; z < depth.at(x, y)) {
+          const auto u {f0 * v0.uv.s + f1 * v1.uv.s + f2 * v2.uv.s};
+          const auto v {f0 * v0.uv.t + f1 * v1.uv.t + f2 * v2.uv.t};
 
           depth.at(x, y) = z;
           output.at(x, y) = material->albedo->sample(u, v);
