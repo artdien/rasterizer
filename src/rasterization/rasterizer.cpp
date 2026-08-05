@@ -33,9 +33,11 @@ auto viewport_matrix(u32 width, u32 height) -> glm::mat4 {
 }
 
 auto vertex_matrix(const glm::vec4& p1, const glm::vec4& p2, const glm::vec4& p3) -> glm::mat3 {
-  return glm::rowMajor3(glm::vec3 {p1.x, p1.y, p1.w}, //
-                        glm::vec3 {p2.x, p2.y, p2.w}, //
-                        glm::vec3 {p3.x, p3.y, p3.w}  //
+  // This is actually the adjugate of the vertex matrix.
+  // It is used for performance reasons to avoid computing the inverse of the vertex matrix.
+  return glm::rowMajor3(glm::vec3 {p2.y * p3.w - p2.w * p3.y, p1.w * p3.y - p1.y * p3.w, p1.y * p2.w - p1.w * p2.y}, //
+                        glm::vec3 {p2.w * p3.x - p2.x * p3.w, p1.x * p3.w - p1.w * p3.x, p1.w * p2.x - p1.x * p2.w}, //
+                        glm::vec3 {p2.x * p3.y - p2.y * p3.x, p1.y * p3.x - p1.x * p3.y, p1.x * p2.y - p1.y * p2.x}  //
   );
 }
 
@@ -144,11 +146,9 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
 
   // If determinant is (close to) zero, the triangle doesn't have visible surface area, so we skip it.
   // If determinant is negative, the triangle is back-facing, so we skip it.
-  if (const auto det {glm::determinant(M)}; det < 1e-6) {
+  if (const auto det {M[0].z * p0.w + M[1].z * p1.w + M[2].z * p2.w}; det < 1e-6) {
     return;
   }
-
-  M = glm::inverse(M);
 
   // -- Clip Triangles and Calculate Screen Extent --
 
