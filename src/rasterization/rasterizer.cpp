@@ -175,13 +175,17 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
 
   // -- Rasterize Triangle --
 
-  for (auto y {y_min}; y < y_max; ++y) {
-    for (auto x {x_min}; x < x_max; ++x) {
-      const glm::vec3 p {(static_cast<f32>(x) + 0.5f), (static_cast<f32>(y) + 0.5f), 1.0f};
-      auto e0 {glm::dot(E0, p)};
-      auto e1 {glm::dot(E1, p)};
-      auto e2 {glm::dot(E2, p)};
+  const glm::vec3 p {(static_cast<f32>(x_min) + 0.5f), (static_cast<f32>(y_min) + 0.5f), 1.0f};
+  auto e0_init {glm::dot(E0, p)};
+  auto e1_init {glm::dot(E1, p)};
+  auto e2_init {glm::dot(E2, p)};
 
+  for (auto y {y_min}; y < y_max; ++y) {
+    auto e0 {e0_init};
+    auto e1 {e1_init};
+    auto e2 {e2_init};
+
+    for (auto x {x_min}; x < x_max; ++x) {
       if (e0 >= 0 && e1 >= 0 && e2 >= 0) {
         // Coefficients for perspective-correct interpolation
         const auto r {1.0f / (e0 + e1 + e2)};
@@ -197,7 +201,15 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
           output.at(x, y) = material->albedo->sample(u, v);
         }
       }
+
+      e0 += E0.x;
+      e1 += E1.x;
+      e2 += E2.x;
     }
+
+    e0_init += E0.y;
+    e1_init += E1.y;
+    e2_init += E2.y;
   }
 }
 
