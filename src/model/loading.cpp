@@ -243,12 +243,14 @@ auto load_model(const std::filesystem::path& filepath, bool convert_to_world_coo
 
   const auto primitives {model.meshes | std::views::transform(&Mesh::primitives) | std::views::join};
   const auto primitives_count {std::ranges::distance(primitives)};
-  const auto vertices_count {std::ranges::distance(primitives | std::views::transform(&Primitive::indices) | std::views::join)};
+  const auto vertices_count {std::ranges::distance(primitives | std::views::transform(&Primitive::positions) | std::views::join)};
+  const auto indices_count {std::ranges::distance(primitives | std::views::transform(&Primitive::indices) | std::views::join)};
 
   std::println("Model '{}' successfully loaded:", filepath.filename().string());
   std::println("  Number of meshes: {}", model.meshes.size());
   std::println("  Number of primitives: {}", primitives_count);
   std::println("  Number of vertices: {}", vertices_count);
+  std::println("  Number of indices: {}", indices_count);
   std::println("  Number of materials: {}", model.materials.size());
   std::println("  Number of textures: {}", model.textures.size());
 
