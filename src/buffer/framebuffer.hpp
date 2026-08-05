@@ -50,6 +50,13 @@ struct FramebufferView {
     return height_;
   }
 
+  /// @brief Fills the entire framebuffer with a specific value.
+  ///
+  /// @param value The value to fill the buffer with.
+  auto clear(T value) -> void {
+    std::fill_n(buffer_, width_ * height_, value);
+  }
+
 private:
   u32 width_;
   u32 height_;
@@ -77,11 +84,6 @@ public:
   ///
   /// @return Modifiable view of framebuffer.
   auto view() -> FramebufferView<T>;
-
-  /// @brief Fills the entire framebuffer with a specific value.
-  ///
-  /// @param value The value to fill the buffer with.
-  auto clear(T value = T {}) -> void;
 
 private:
   u32 width_;
