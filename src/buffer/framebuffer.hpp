@@ -25,7 +25,7 @@ struct FramebufferView {
   ///
   /// @param x X-coordinate (column).
   /// @param y Y-coordinate (row).
-  auto at(u32 x, u32 y) -> u32& {
+  auto at(u32 x, u32 y) -> T& {
     return buffer_[x + (height_ - (y + 1)) * width_];
   }
 
@@ -36,7 +36,7 @@ struct FramebufferView {
   ///
   /// @param x X-coordinate (column).
   /// @param y Y-coordinate (row).
-  auto at(u32 x, u32 y) const -> const u32& {
+  auto at(u32 x, u32 y) const -> const T& {
     return buffer_[x + (height_ - (y + 1)) * width_];
   }
 
