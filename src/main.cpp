@@ -20,6 +20,12 @@ constexpr auto WINDOW_TITLE {std::string_view {"Software Rasterizer"}};
 constexpr auto UPDATE_TIME_MS {1000.0 / 30.0};
 constexpr auto MAX_LAG_MS {100.0};
 
+auto process_input(Window* window, const KeyboardInput& keyboard) -> void {
+  if (keyboard.key == "esc") {
+    window->close();
+  }
+}
+
 } // namespace
 
 auto main(i32 argc, c8* argv[]) -> int {
@@ -42,9 +48,10 @@ auto main(i32 argc, c8* argv[]) -> int {
 
   auto lag {0.0};
 
-  window.open([&](f64 elapsed_time) {
-    lag = std::min(lag + elapsed_time, MAX_LAG_MS);
+  window.open([&](KeyboardInput keyboard, f64 elapsed_time) {
+    process_input(&window, keyboard);
 
+    lag = std::min(lag + elapsed_time, MAX_LAG_MS);
     while (lag >= UPDATE_TIME_MS) {
       rasterizer.rasterize(window.buffer(), model, view, projection);
       lag -= UPDATE_TIME_MS;

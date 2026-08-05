@@ -4,6 +4,7 @@
 #include <string>
 
 #include "buffer/framebuffer.hpp"
+#include "platform/input.hpp"
 #include "platform/types.hpp"
 
 namespace rasterizer::platform {
@@ -31,8 +32,9 @@ public:
   /// @param execute_per_frame A function which will be executed once per frame.
   ///                          Typically this function should contain update and rendering logic.
   ///                          The arguments for this function are:
-  ///                          - Elapsed time since last frame.
-  auto open(std::function<void(f64)> execute_per_frame) -> void;
+  ///                          - Last keyboard input event since last frame.
+  ///                          - Elapsed time since last frame in milliseconds.
+  auto open(std::function<void(KeyboardInput, f64)> execute_per_frame) -> void;
 
   /// @brief Closes an opened window.
   auto close() -> void;

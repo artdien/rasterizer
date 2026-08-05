@@ -34,6 +34,7 @@ target_sources(
     impl/stb.cpp
     model/loading.cpp
     model/material.cpp
+    platform/input.cpp
     platform/window.cpp
     rasterization/rasterizer.cpp
     utils/cli.cpp
