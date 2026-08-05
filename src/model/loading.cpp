@@ -67,7 +67,7 @@ auto load_texture(const fastgltf::Asset& asset, const fastgltf::Texture& texture
         deleter,
         static_cast<u32>(width),
         static_cast<u32>(height),
-        static_cast<u32>(channels),
+        4u, // pass desired channels here, not actual channels in data
     };
   }};
 
