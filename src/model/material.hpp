@@ -55,7 +55,7 @@ public:
   /// @param v Vertical normalized coordinate.
   /// @return Sampled value packed as u32 in RGB format
   ///         with the most significant eight bits being zero.
-  auto sample(f32 u, f32 v) -> u32;
+  auto sample(f32 u, f32 v) const -> u32;
 
   TextureWrap wrap_s;
   TextureWrap wrap_t;

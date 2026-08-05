@@ -37,7 +37,7 @@ Texture::Texture() : data_ {nullptr, [](auto _) {}}, width_ {0}, height_ {0}, ch
 Texture::Texture(uc8* data, ImageDeleter deleter, u32 width, u32 height, u32 channels)
     : data_ {std::unique_ptr<uc8[], ImageDeleter>(data, deleter)}, width_ {width}, height_ {height}, channels_ {channels} {}
 
-auto Texture::sample(f32 u, f32 v) -> u32 {
+auto Texture::sample(f32 u, f32 v) const -> u32 {
   if (!data_) [[unlikely]] {
     return 0;
   }
