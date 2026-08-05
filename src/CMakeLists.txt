@@ -32,6 +32,7 @@ target_sources(
     impl/fenster.cpp
     impl/stb.cpp
     model/loading.cpp
+    model/material.cpp
     platform/window.cpp
     utils/cli.cpp
     main.cpp

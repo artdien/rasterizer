@@ -4,7 +4,6 @@
 #include <cstddef>
 #include <format>
 #include <iterator>
-#include <memory>
 #include <print>
 #include <ranges>
 #include <stdexcept>
@@ -50,6 +49,55 @@ auto load_file(const std::filesystem::path& filepath) -> fastgltf::Asset {
 auto load_texture(const fastgltf::Asset& asset, const fastgltf::Texture& texture) -> Texture {
   auto texture_ {Texture {}};
 
+  // -- LOAD IMAGE --
+
+  if (const auto& idx {texture.imageIndex}; !idx.has_value()) {
+    throw std::runtime_error(std::format("Texture '{}' is missing image", texture.name));
+  }
+
+  const auto deleter {[](uc8* data) { stbi_image_free(data); }};
+
+  const auto load_from_memory {[&](const stbi_uc* data, i32 size) -> Texture {
+    auto width {i32 {}};
+    auto height {i32 {}};
+    auto channels {i32 {}};
+
+    return {
+        stbi_load_from_memory(data, size, &width, &height, &channels, 4),
+        deleter,
+        static_cast<u32>(width),
+        static_cast<u32>(height),
+        static_cast<u32>(channels),
+    };
+  }};
+
+  const auto load_from_array {[&](const std::byte* buffer, usize length) -> Texture {
+    const auto data {reinterpret_cast<const stbi_uc*>(buffer)};
+    const auto size {static_cast<i32>(length)};
+    return load_from_memory(data, size);
+  }};
+
+  texture_ = std::visit(fastgltf::visitor {
+                            [&](auto& _) { return Texture {}; },
+                            [&](const fastgltf::sources::Array& array) { return load_from_array(array.bytes.data(), array.bytes.size()); },
+                            [&](const fastgltf::sources::BufferView& view) {
+                              auto& buffer_view {asset.bufferViews[view.bufferViewIndex]};
+                              auto& buffer {asset.buffers[buffer_view.bufferIndex]};
+
+                              return std::visit(fastgltf::visitor {
+                                                    [&](auto _) { return Texture {}; },
+                                                    [&](const fastgltf::sources::Array& array) {
+                                                      const auto data {array.bytes.data() + buffer_view.byteOffset};
+                                                      const auto size {buffer_view.byteLength};
+
+                                                      return load_from_array(data, size);
+                                                    },
+                                                },
+                                                buffer.data);
+                            },
+                        },
+                        asset.images[texture.imageIndex.value()].data);
+
   // -- LOAD SAMPLER --
 
   if (const auto& idx {texture.samplerIndex}; !idx.has_value()) {
@@ -69,44 +117,6 @@ auto load_texture(const fastgltf::Asset& asset, const fastgltf::Texture& texture
 
   texture_.wrap_s = map_texture_wrap(asset.samplers[texture.samplerIndex.value()].wrapS);
   texture_.wrap_t = map_texture_wrap(asset.samplers[texture.samplerIndex.value()].wrapT);
-
-  // -- LOAD IMAGE --
-
-  if (const auto& idx {texture.imageIndex}; !idx.has_value()) {
-    throw std::runtime_error(std::format("Texture '{}' is missing image", texture.name));
-  }
-
-  const auto deleter {[](uc8* data) { stbi_image_free(data); }};
-
-  const auto load_from_memory {[&](Texture* texture, const stbi_uc* data, i32 size) {
-    auto width {i32 {}}, height {i32 {}}, channels {i32 {}};
-    texture->image = std::unique_ptr<uc8[], ImageDeleter>(stbi_load_from_memory(data, size, &width, &height, &channels, 4), deleter);
-    texture->width = static_cast<u32>(width);
-    texture->height = static_cast<u32>(height);
-    texture->channels = static_cast<u32>(channels);
-  }};
-
-  const auto load_from_array {[&](const std::byte* buffer, usize length) {
-    const auto data {reinterpret_cast<const stbi_uc*>(buffer)};
-    const auto size {static_cast<i32>(length)};
-    load_from_memory(&texture_, data, size);
-  }};
-
-  std::visit(fastgltf::visitor {
-                 [&](auto& _) { throw std::runtime_error(std::format("Unsupported image format for '{}'", texture.name)); },
-                 [&](const fastgltf::sources::Array& array) { load_from_array(array.bytes.data(), array.bytes.size()); },
-                 [&](const fastgltf::sources::BufferView& view) {
-                   auto& buffer_view {asset.bufferViews[view.bufferViewIndex]};
-                   auto& buffer {asset.buffers[buffer_view.bufferIndex]};
-                   std::visit(
-                       fastgltf::visitor {
-                           [&](auto _) { throw std::runtime_error(std::format("Unsupported image format for '{}'", texture.name)); },
-                           [&](const fastgltf::sources::Array& array) { load_from_array(array.bytes.data() + buffer_view.byteOffset, buffer_view.byteLength); },
-                       },
-                       buffer.data);
-                 },
-             },
-             asset.images[texture.imageIndex.value()].data);
 
   return texture_;
 }
