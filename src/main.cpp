@@ -4,10 +4,9 @@
 #include "model/loading.hpp"
 #include "platform/types.hpp"
 #include "platform/window.hpp"
+#include "rasterization/camera.hpp"
 #include "rasterization/rasterizer.hpp"
 #include "utils/cli.hpp"
-
-#include <glm/gtc/matrix_transform.hpp>
 
 using namespace rasterizer::utils;
 using namespace rasterizer::model;
@@ -20,9 +19,29 @@ constexpr auto WINDOW_TITLE {std::string_view {"Software Rasterizer"}};
 constexpr auto UPDATE_TIME_MS {1000.0 / 30.0};
 constexpr auto MAX_LAG_MS {100.0};
 
-auto process_input(Window* window, const KeyboardInput& keyboard) -> void {
+auto process_input(Window* window, Camera* camera, const KeyboardInput& keyboard, f32 dt) -> void {
   if (keyboard.key == "esc") {
     window->close();
+  } else if (keyboard.key == "w") {
+    camera->move_forward(dt);
+  } else if (keyboard.key == "s") {
+    camera->move_backward(dt);
+  } else if (keyboard.key == "a") {
+    camera->move_left(dt);
+  } else if (keyboard.key == "d") {
+    camera->move_right(dt);
+  } else if (keyboard.key == "e") {
+    camera->move_up(dt);
+  } else if (keyboard.key == "q") {
+    camera->move_down(dt);
+  } else if (keyboard.key == "left") {
+    camera->look_left(dt);
+  } else if (keyboard.key == "right") {
+    camera->look_right(dt);
+  } else if (keyboard.key == "up") {
+    camera->look_up(dt);
+  } else if (keyboard.key == "down") {
+    camera->look_down(dt);
   }
 }
 
@@ -42,18 +61,16 @@ auto main(i32 argc, c8* argv[]) -> int {
 
   auto window {Window {width, height, std::string(WINDOW_TITLE)}};
   auto rasterizer {Rasterizer {width, height}};
-
-  glm::mat4 view {glm::lookAt(glm::vec3(0.0f, 0.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f))};
-  glm::mat4 projection {glm::perspective(glm::radians(45.0f), static_cast<f32>(width) / static_cast<f32>(height), 0.1f, 100.0f)};
+  auto camera {Camera {width, height}};
 
   auto lag {0.0};
 
-  window.open([&](KeyboardInput keyboard, f64 elapsed_time) {
-    process_input(&window, keyboard);
+  window.open([&](KeyboardInput keyboard, f64 elapsed_time_ms) {
+    process_input(&window, &camera, keyboard, static_cast<f32>(elapsed_time_ms / 1000.0f));
 
-    lag = std::min(lag + elapsed_time, MAX_LAG_MS);
+    lag = std::min(lag + elapsed_time_ms, MAX_LAG_MS);
     while (lag >= UPDATE_TIME_MS) {
-      rasterizer.rasterize(window.buffer(), model, view, projection);
+      rasterizer.rasterize(window.buffer(), model, camera.view_matrix(), camera.projection_matrix());
       lag -= UPDATE_TIME_MS;
     }
   });
