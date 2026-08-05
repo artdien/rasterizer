@@ -130,11 +130,10 @@ auto clip(const Vertex& v0, const Vertex& v1, const Vertex& v2) -> std::optional
 }
 
 auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::FramebufferView<f32> depth, const Vertex& v0, const Vertex& v1, const Vertex& v2,
-                        const model::Material* material) -> void {
+                        const model::Material* material, const glm::mat4& viewport) -> void {
 
   // -- Transform to Viewport Coordinates --
 
-  const auto viewport {viewport_matrix(output.width(), output.height())};
   const auto p0 {viewport * v0.position};
   const auto p1 {viewport * v1.position};
   const auto p2 {viewport * v2.position};
@@ -224,6 +223,7 @@ auto Rasterizer::rasterize(buffer::FramebufferView<u32> output, const model::Mod
   depth.clear(std::numeric_limits<f32>::infinity());
 
   const auto transformation {projection * view};
+  const auto viewport {viewport_matrix(output.width(), output.height())};
 
   for (const auto& mesh : model.meshes) {
     for (const auto& primitive : mesh.primitives) {
@@ -248,7 +248,7 @@ auto Rasterizer::rasterize(buffer::FramebufferView<u32> output, const model::Mod
             .uv = primitive.texcoords[i2],
         }};
 
-        rasterize_triangle(output, depth, v0, v1, v2, primitive.material);
+        rasterize_triangle(output, depth, v0, v1, v2, primitive.material, viewport);
       }
     }
   }
