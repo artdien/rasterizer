@@ -24,6 +24,7 @@ target_compile_definitions(
   rasterizer
   PRIVATE
     FENSTER_HEADER
+    GLM_ENABLE_EXPERIMENTAL
 )
 target_sources(
   rasterizer
@@ -34,6 +35,7 @@ target_sources(
     model/loading.cpp
     model/material.cpp
     platform/window.cpp
+    rasterization/rasterizer.cpp
     utils/cli.cpp
     main.cpp
 )
