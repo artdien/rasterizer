@@ -41,12 +41,12 @@ struct FramebufferView {
   }
 
   /// @brief Returns width of framebuffer.
-  auto width() -> u32 {
+  auto width() const -> u32 {
     return width_;
   }
 
   /// @brief Returns height of framebuffer.
-  auto height() -> u32 {
+  auto height() const -> u32 {
     return height_;
   }
 

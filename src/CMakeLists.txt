@@ -36,8 +36,10 @@ target_sources(
     model/material.cpp
     platform/input.cpp
     platform/window.cpp
+    rasterization/bin.cpp
     rasterization/camera.cpp
     rasterization/rasterizer.cpp
+    rasterization/triangle.cpp
     utils/cli.cpp
     main.cpp
 )
