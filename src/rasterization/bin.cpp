@@ -1,5 +1,8 @@
 #include "rasterization/bin.hpp"
 
+#include <algorithm>
+#include <atomic>
+
 namespace rasterizer::rasterization {
 
 BinPool::BinPool(u32 width, u32 height, u32 tile_size)
@@ -9,7 +12,7 @@ BinPool::BinPool(u32 width, u32 height, u32 tile_size)
 auto BinPool::count(u32 tx, u32 ty) -> void {
   const auto idx {tx + ty * tiles_x_};
 
-  counts_[idx].fetch_add(1, std::memory_order_relaxed);
+  std::atomic_ref(counts_[idx]).fetch_add(1, std::memory_order_relaxed);
 }
 
 auto BinPool::allocate() -> void {
@@ -18,7 +21,7 @@ auto BinPool::allocate() -> void {
 
   for (auto i {0u}; i < tiles; ++i) {
     offsets_[i] = total_triangles;
-    total_triangles += counts_[i].load(std::memory_order_relaxed);
+    total_triangles += counts_[i];
   }
 
   bins_.resize(total_triangles);
@@ -26,25 +29,24 @@ auto BinPool::allocate() -> void {
 
 auto BinPool::add(u32 tx, u32 ty, u32 triangle_idx) -> void {
   const auto idx {tx + ty * tiles_x_};
-  const auto tile {offsets_[idx]};
+  const auto tile {std::atomic_ref<u32>(offsets_[idx]).fetch_add(1, std::memory_order_relaxed)};
 
   bins_[tile] = triangle_idx;
-  offsets_[idx] += 1;
 }
 
 auto BinPool::bin(u32 tx, u32 ty) -> std::span<u32> {
   const auto idx {tx + ty * tiles_x_};
-  const auto count {counts_[idx].load(std::memory_order_relaxed)};
+  const auto count {std::atomic_ref(counts_[idx]).load(std::memory_order_relaxed)};
 
   return std::span {bins_.data() + offsets_[idx] - count, count};
 }
 
 auto BinPool::reset() -> void {
-  const auto tiles {tiles_x_ * tiles_y_};
+  std::fill_n(counts_.begin(), counts_.size(), 0u);
+}
 
-  for (auto i {0u}; i < tiles; ++i) {
-    counts_[i].store(0, std::memory_order_relaxed);
-  }
+auto BinPool::reserve(u32 capacity) -> void {
+  bins_.reserve(capacity);
 }
 
 } // namespace rasterizer::rasterization

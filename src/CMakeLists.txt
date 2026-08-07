@@ -39,6 +39,7 @@ target_sources(
     rasterization/bin.cpp
     rasterization/camera.cpp
     rasterization/rasterizer.cpp
+    rasterization/thread_pool.cpp
     rasterization/triangle.cpp
     utils/cli.cpp
     main.cpp

@@ -5,9 +5,17 @@
 #include "buffer/framebuffer.hpp"
 #include "model/model.hpp"
 #include "rasterization/bin.hpp"
+#include "rasterization/thread_pool.hpp"
 #include "rasterization/triangle.hpp"
 
 namespace rasterizer::rasterization {
+
+// Depending on the context this struct can represent
+// a single tile as well as a range of multiple tiles.
+struct Tile {
+  glm::uvec2 min;
+  glm::uvec2 max;
+};
 
 class Rasterizer {
 public:
@@ -45,6 +53,9 @@ private:
 
   BinPool bins_;
   TrianglePool triangles_;
+  ThreadPool threads_;
+
+  std::vector<Tile> tiles_;
 
   auto process_triangles(const model::Model& model, const glm::mat4& view, const glm::mat4& projection) -> void;
   auto bin_triangles() -> void;

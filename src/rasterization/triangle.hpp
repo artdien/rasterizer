@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <new>
 #include <vector>
 
@@ -35,8 +36,9 @@ class TrianglePool {
 public:
   /// @brief Constructs a triangle pool with an initial capacity.
   ///
-  /// The pool minimizes allocations by reusing a pre-allocated buffer.
-  /// It acts as a growable vector that can be reset without deallocating the underlying storage.
+  /// The pool pre-allocates a buffer for the given number of triangles.
+  /// It can be reset without deallocating the underlying storage,
+  /// and its capacity can be increased explicitly via reserve().
   ///
   /// @param capacity Initial number of triangles to allocate memory for.
   TrianglePool(u32 capacity = 1u);
@@ -49,8 +51,9 @@ public:
 
   /// @brief Adds a triangle to the pool and returns its assigned index.
   ///
-  /// If the current capacity is exceeded,
-  /// the pool will automatically double its internal storage.
+  /// The caller must ensure that the pool has sufficient capacity using reserve()
+  /// before adding triangles past the initial capacity.
+  /// No automatic growth occurs, so out-of-bounds access is possible if not managed externally.
   ///
   /// @param triangle Triangle data to store.
   ///
@@ -62,6 +65,13 @@ public:
   /// This marks all existing triangles as available for overwrite,
   /// but keeps the allocated memory intact to avoid repeated allocations.
   auto reset() -> void;
+
+  /// @brief Reserves capacity for a given number of triangles.
+  ///
+  /// This ensures that the pool can hold at least the specified number of triangles.
+  ///
+  /// @param capacity Minimum number of triangles to reserve space for.
+  auto reserve(u32 capacity) -> void;
 
   /// @brief Returns the number of active triangles currently in the pool.
   auto size() const -> u32 {
@@ -77,7 +87,7 @@ public:
   }
 
 private:
-  u32 current_;
+  std::atomic<u32> current_;
   std::vector<Triangle> triangles_;
 };
 

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <optional>
+#include <ranges>
 
 #include <glm/gtx/matrix_major_storage.hpp>
 
@@ -14,11 +15,6 @@ namespace {
 struct Extent {
   glm::vec2 min;
   glm::vec2 max;
-};
-
-struct Tile {
-  glm::uvec2 min;
-  glm::uvec2 max;
 };
 
 auto viewport_matrix(u32 width, u32 height) -> glm::mat4 {
@@ -192,11 +188,12 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
 
 } // namespace
 
-Rasterizer::Rasterizer(u32 width, u32 height, u32 tile_size) : tile_size_ {tile_size}, depth_ {width, height}, bins_ {width, height, tile_size} {}
+Rasterizer::Rasterizer(u32 width, u32 height, u32 tile_size) : tile_size_ {tile_size}, depth_ {width, height}, bins_ {width, height, tile_size}, threads_ {} {}
 
 auto Rasterizer::rasterize(buffer::FramebufferView<u32> output, const model::Model& model, const glm::mat4& view, const glm::mat4& projection) -> void {
   bins_.reset();
   triangles_.reset();
+  threads_.reset();
 
   output.clear(0u);
   depth_.view().clear(std::numeric_limits<f32>::infinity());
@@ -214,132 +211,205 @@ auto Rasterizer::process_triangles(const model::Model& model, const glm::mat4& v
   const auto transformation {projection * view};
   const auto viewport {viewport_matrix(width, height)};
 
+  const auto triangles_total {std::ranges::fold_left(                                   //
+      model.meshes                                                                      //
+          | std::views::transform([](const auto& m) { return m.primitives; })           //
+          | std::views::join                                                            //
+          | std::views::transform([](const auto& p) { return p.indices.size() / 3u; }), //
+      0u, std::plus<u32>())};
+
+  triangles_.reserve(triangles_total);
+
   for (const auto& mesh : model.meshes) {
     for (const auto& primitive : mesh.primitives) {
-      for (auto i {0uz}; i < primitive.indices.size(); i += 3) {
-        const auto i0 {primitive.indices[i]};
-        const auto i1 {primitive.indices[i + 1]};
-        const auto i2 {primitive.indices[i + 2]};
+      const auto triangles_per_primitive {primitive.indices.size() / 3u};
+      const auto triangles_per_thread {triangles_per_primitive / threads_.capacity()};
+      const auto remainder {triangles_per_primitive % threads_.capacity()};
 
-        // -- Apply View and Projection Transformation --
+      auto begin {0u};
+      auto end {0u};
 
-        auto p0 {transformation * glm::vec4 {primitive.positions[i0], 1.0f}};
-        auto p1 {transformation * glm::vec4 {primitive.positions[i1], 1.0f}};
-        auto p2 {transformation * glm::vec4 {primitive.positions[i2], 1.0f}};
+      for (auto i {0u}; i < threads_.capacity(); ++i) {
+        end += triangles_per_thread + (i < remainder ? 1u : 0u);
 
-        // -- Clip Triangle --
+        // Since we're inside an inner loop and we only synchronize after the outer loop has finished,
+        // we need to capture a pointer to the primitive by value to avoid a potential race condition
+        // when the reference goes stale in the next loop iteration.
+        const auto* prim {&primitive};
 
-        const auto result {clip(p0, p1, p2)};
-        if (!result.has_value()) {
-          continue;
-        }
+        threads_.schedule(
+            [&, prim, begin, end] {
+              for (auto i {begin}; i < end; ++i) {
+                const auto i0 {prim->indices[3u * i]};
+                const auto i1 {prim->indices[3u * i + 1u]};
+                const auto i2 {prim->indices[3u * i + 2u]};
 
-        // -- Transform to Viewport Coordinates --
+                // -- Apply View and Projection Transformation --
 
-        p0 = viewport * p0;
-        p1 = viewport * p1;
-        p2 = viewport * p2;
+                const auto p0_clip {transformation * glm::vec4 {prim->positions[i0], 1.0f}};
+                const auto p1_clip {transformation * glm::vec4 {prim->positions[i1], 1.0f}};
+                const auto p2_clip {transformation * glm::vec4 {prim->positions[i2], 1.0f}};
 
-        // -- Backface Culling --
+                // -- Transform to Viewport Coordinates --
 
-        auto M {vertex_matrix(p0, p1, p2)};
+                const auto p0 {viewport * p0_clip};
+                const auto p1 {viewport * p1_clip};
+                const auto p2 {viewport * p2_clip};
 
-        // If determinant is (close to) zero, the triangle doesn't have visible surface area, so we skip it.
-        // If determinant is negative, the triangle is back-facing, so we skip it.
-        if (const auto det {M[0].z * p0.w + M[1].z * p1.w + M[2].z * p2.w}; det < 1e-6) {
-          continue;
-        }
+                // -- Backface Culling --
 
-        // -- Calculate Screen Extent --
+                auto M {vertex_matrix(p0, p1, p2)};
 
-        const auto extent {result.value()};
-        const auto x_min {static_cast<u32>(glm::max(0.0f, 0.5f * width * (extent.min.x + 1.0f)))};
-        const auto x_max {static_cast<u32>(glm::min(static_cast<f32>(width), 0.5f * width * (extent.max.x + 1.0f) + 1.0f))};
-        const auto y_min {static_cast<u32>(glm::max(0.0f, 0.5f * height * (extent.min.y + 1.0f)))};
-        const auto y_max {static_cast<u32>(glm::min(static_cast<f32>(height), 0.5f * height * (extent.max.y + 1u) + 1.0f))};
+                // If determinant is (close to) zero, the triangle doesn't have visible surface area, so we skip it.
+                // If determinant is negative, the triangle is back-facing, so we skip it.
+                if (const auto det {M[0].z * p0.w + M[1].z * p1.w + M[2].z * p2.w}; det < 1e-6) {
+                  continue;
+                }
 
-        // -- Add Processed Triangle --
+                // -- Clip Triangle --
 
-        const auto v0 {Vertex {
-            .position = p0,
-            .normal = primitive.normals[i0],
-            .edge = M[0],
-            .uv = primitive.texcoords[i0],
-        }};
-        const auto v1 {Vertex {
-            .position = p1,
-            .normal = primitive.normals[i1],
-            .edge = M[1],
-            .uv = primitive.texcoords[i1],
-        }};
-        const auto v2 {Vertex {
-            .position = p2,
-            .normal = primitive.normals[i2],
-            .edge = M[2],
-            .uv = primitive.texcoords[i2],
-        }};
+                const auto result {clip(p0_clip, p1_clip, p2_clip)};
+                if (!result.has_value()) {
+                  continue;
+                }
 
-        triangles_.add({
-            .v0 = v0,
-            .v1 = v1,
-            .v2 = v2,
-            .min = {x_min, y_min},
-            .max = {x_max, y_max},
-            .material = primitive.material,
-        });
+                // -- Calculate Screen Extent --
+
+                const auto extent {result.value()};
+                const auto x_min {static_cast<u32>(glm::max(0.0f, 0.5f * width * (extent.min.x + 1.0f)))};
+                const auto x_max {static_cast<u32>(glm::min(static_cast<f32>(width), 0.5f * width * (extent.max.x + 1.0f) + 1.0f))};
+                const auto y_min {static_cast<u32>(glm::max(0.0f, 0.5f * height * (extent.min.y + 1.0f)))};
+                const auto y_max {static_cast<u32>(glm::min(static_cast<f32>(height), 0.5f * height * (extent.max.y + 1.0f) + 1.0f))};
+
+                // -- Add Processed Triangle --
+
+                const auto v0 {Vertex {
+                    .position = p0,
+                    .normal = prim->normals[i0],
+                    .edge = M[0],
+                    .uv = prim->texcoords[i0],
+                }};
+                const auto v1 {Vertex {
+                    .position = p1,
+                    .normal = prim->normals[i1],
+                    .edge = M[1],
+                    .uv = prim->texcoords[i1],
+                }};
+                const auto v2 {Vertex {
+                    .position = p2,
+                    .normal = prim->normals[i2],
+                    .edge = M[2],
+                    .uv = prim->texcoords[i2],
+                }};
+
+                triangles_.add({
+                    .v0 = v0,
+                    .v1 = v1,
+                    .v2 = v2,
+                    .min = {x_min, y_min},
+                    .max = {x_max, y_max},
+                    .material = prim->material,
+                });
+              }
+            },
+            false);
+
+        begin = end;
       }
     }
   }
+
+  threads_.notify();
+  threads_.sync();
 }
 
 auto Rasterizer::bin_triangles() -> void {
+  const auto triangles_total {triangles_.size()};
+  const auto triangles_per_thread {triangles_total / threads_.capacity()};
+  const auto remainder {triangles_total % threads_.capacity()};
 
-  // -- Count Triangles per Tile --
+  bins_.reserve(triangles_total);
+  tiles_.reserve(triangles_total);
 
-  for (auto idx {0u}; idx < triangles_.size(); ++idx) {
-    const auto [min, max] {overlapping_tiles(triangles_[idx], tile_size_)};
+  auto begin {0u};
+  std::atomic<u32> count {0u};
 
-    for (u32 ty = min.y; ty <= max.y; ++ty) {
-      for (u32 tx = min.x; tx <= max.x; ++tx) {
-        bins_.count(tx, ty);
-      }
-    }
+  for (auto i {0u}; i < threads_.capacity(); ++i) {
+    auto end {begin + triangles_per_thread + (i < remainder ? 1u : 0u)};
+
+    threads_.schedule(
+        [&, begin, end] {
+          // -- Count Triangles per Tile --
+
+          for (auto idx {begin}; idx < end; ++idx) {
+            tiles_[idx] = overlapping_tiles(triangles_[idx], tile_size_);
+            const auto range {tiles_[idx]};
+
+            for (auto ty {range.min.y}; ty <= range.max.y; ++ty) {
+              for (auto tx {range.min.x}; tx <= range.max.x; ++tx) {
+                bins_.count(tx, ty);
+              }
+            }
+          }
+
+          // --  Allocate Memory for Binning --
+
+          threads_.barrier();
+
+          if (count.fetch_add(1) == 0) {
+            bins_.allocate();
+          }
+
+          threads_.barrier();
+
+          // --  Bin Triangles --
+
+          for (auto idx {begin}; idx < end; ++idx) {
+            const auto range {tiles_[idx]};
+
+            for (auto ty {range.min.y}; ty <= range.max.y; ++ty) {
+              for (auto tx {range.min.x}; tx <= range.max.x; ++tx) {
+                bins_.add(tx, ty, idx);
+              }
+            }
+          }
+        },
+        false);
+
+    begin = end;
   }
 
-  // --  Allocate Memory for Binning --
-
-  bins_.allocate();
-
-  // --  Bin Triangles --
-
-  for (auto idx {0u}; idx < triangles_.size(); ++idx) {
-    const auto [min, max] {overlapping_tiles(triangles_[idx], tile_size_)};
-
-    for (u32 ty = min.y; ty <= max.y; ++ty) {
-      for (u32 tx = min.x; tx <= max.x; ++tx) {
-        bins_.add(tx, ty, idx);
-      }
-    }
-  }
+  threads_.notify();
+  threads_.sync();
 }
 
 auto Rasterizer::rasterize_tiles(buffer::FramebufferView<u32> output) -> void {
   const auto tiles_x {bins_.tiles_x()};
   const auto tiles_y {bins_.tiles_y()};
+  const auto stride {threads_.capacity()};
 
-  for (auto t {0u}; t < tiles_x * tiles_y; ++t) {
-    const auto tx {t % tiles_x};
-    const auto ty {t / tiles_x};
+  for (auto i {0u}; i < stride; ++i) {
+    threads_.schedule(
+        [&, i, stride, tiles_x, tiles_y] {
+          for (auto tile {i}; tile < tiles_x * tiles_y; tile += stride) {
+            const auto tx {tile % tiles_x};
+            const auto ty {tile / tiles_x};
 
-    const auto x_min {tx * tile_size_};
-    const auto x_max {std::min(x_min + tile_size_, output.width())};
-    const auto y_min {ty * tile_size_};
-    const auto y_max {std::min(y_min + tile_size_, output.height())};
+            const auto x_min {tx * tile_size_};
+            const auto x_max {std::min(x_min + tile_size_, output.width())};
+            const auto y_min {ty * tile_size_};
+            const auto y_max {std::min(y_min + tile_size_, output.height())};
 
-    for (auto idx : bins_.bin(tx, ty)) {
-      rasterize_triangle(output, depth_.view(), triangles_[idx], {.min = {x_min, y_min}, .max = {x_max, y_max}});
-    }
+            for (auto idx : bins_.bin(tx, ty)) {
+              rasterize_triangle(output, depth_.view(), triangles_[idx], {.min = {x_min, y_min}, .max = {x_max, y_max}});
+            }
+          }
+        },
+        false);
   }
+
+  threads_.notify();
+  threads_.sync();
 }
 
 } // namespace rasterizer::rasterization

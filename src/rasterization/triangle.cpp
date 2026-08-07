@@ -7,17 +7,20 @@ TrianglePool::TrianglePool(u32 capacity) : current_ {0u} {
 }
 
 auto TrianglePool::add(const Triangle& triangle) -> u32 {
-  if (current_ >= triangles_.size()) {
-    triangles_.resize(2 * triangles_.size());
-  }
+  const auto idx {current_.fetch_add(1, std::memory_order_relaxed)};
+  triangles_[idx] = triangle;
 
-  triangles_[current_] = triangle;
-
-  return current_++;
+  return idx;
 };
 
 auto TrianglePool::reset() -> void {
-  current_ = 0u;
+  current_.store(0, std::memory_order_relaxed);
+}
+
+auto TrianglePool::reserve(u32 capacity) -> void {
+  if (triangles_.size() < capacity) {
+    triangles_.resize(capacity);
+  }
 }
 
 } // namespace rasterizer::rasterization

@@ -1,4 +1,3 @@
-#include <atomic>
 #include <span>
 #include <vector>
 
@@ -28,8 +27,8 @@ public:
 
   /// @brief Increments the triangle count for a specific tile.
   ///
-  /// This method is thread-safe and can be called concurrently by multiple threads
-  /// during the counting phase of rasterization.
+  /// This method is thread-safe and can be called concurrently
+  /// by multiple threads during the counting phase of rasterization.
   ///
   /// @param tx Tile index along X-axis.
   /// @param ty Tile index along Y-axis.
@@ -43,6 +42,9 @@ public:
   /// @brief Adds a triangle index to the bin of a specific tile.
   ///
   /// This assumes that allocate() has already been called to allocate sufficient memory.
+  ///
+  /// This method is thread-safe and can be called concurrently
+  /// by multiple threads during the binning phase of rasterization.
   ///
   /// @param tx           Tile index along X-axis.
   /// @param ty           Tile index along Y-axis.
@@ -62,6 +64,14 @@ public:
   /// This prepares the pool for a new frame of rasterization.
   auto reset() -> void;
 
+  /// @brief Reserves capacity for the bin buffer storing triangle indices.
+  ///
+  /// Call before allocate() if the total number of triangles is known in advance
+  /// to avoid potential reallocations.
+  ///
+  /// @param capacity Minimum number of triangle indices to reserve space for.
+  auto reserve(u32 capacity) -> void;
+
   /// @brief Returns the number of tiles along the X-axis.
   auto tiles_x() const -> u32 {
     return tiles_x_;
@@ -78,7 +88,7 @@ private:
 
   std::vector<u32> bins_;
   std::vector<u32> offsets_;
-  std::vector<std::atomic<u32>> counts_;
+  std::vector<u32> counts_;
 };
 
 } // namespace rasterizer::rasterization
