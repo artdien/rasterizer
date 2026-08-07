@@ -134,6 +134,9 @@ auto load_material(const std::vector<Texture>& textures, const fastgltf::Materia
     material_.albedo = &textures[idx.value().textureIndex];
   }
 
+  material_.masked = material.alphaMode == fastgltf::AlphaMode::Mask;
+  material_.alpha_cutoff = material.alphaCutoff;
+
   return material_;
 }
 

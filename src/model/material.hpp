@@ -53,9 +53,8 @@ public:
   ///
   /// @param u Horizontal normalized coordinate.
   /// @param v Vertical normalized coordinate.
-  /// @return Sampled value packed as u32 in RGB format
-  ///         with the most significant eight bits being zero.
-  auto sample(f32 u, f32 v) const -> u32;
+  /// @return RGBA components normalized to [0, 1].
+  auto sample(f32 u, f32 v) const -> glm::vec4;
 
   TextureWrap wrap_s;
   TextureWrap wrap_t;
@@ -68,8 +67,10 @@ private:
 };
 
 struct Material {
-  glm::vec4 base;
   const Texture* albedo;
+  glm::vec4 base;
+  f32 alpha_cutoff;
+  bool masked;
 };
 
 } // namespace rasterizer::model

@@ -17,6 +17,15 @@ struct Extent {
   glm::vec2 max;
 };
 
+auto color(glm::vec4 value) -> u32 {
+  // Alpha value not required, since output buffer doesn't support it
+  const auto r {static_cast<u32>(glm::clamp(value.r * 255.0f, 0.0f, 255.0f))};
+  const auto g {static_cast<u32>(glm::clamp(value.g * 255.0f, 0.0f, 255.0f))};
+  const auto b {static_cast<u32>(glm::clamp(value.b * 255.0f, 0.0f, 255.0f))};
+
+  return (r << 16) | (g << 8) | b;
+}
+
 auto viewport_matrix(u32 width, u32 height) -> glm::mat4 {
   const auto half_width {0.5f * width};
   const auto half_height {0.5f * height};
@@ -170,8 +179,14 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
           const auto u {f0 * triangle.v0.uv.s + f1 * triangle.v1.uv.s + f2 * triangle.v2.uv.s};
           const auto v {f0 * triangle.v0.uv.t + f1 * triangle.v1.uv.t + f2 * triangle.v2.uv.t};
 
-          depth.at(x, y) = z;
-          output.at(x, y) = triangle.material->albedo->sample(u, v);
+          const auto masked {triangle.material->masked};
+          const auto alpha_cutoff {triangle.material->alpha_cutoff};
+          const auto albedo {triangle.material->albedo->sample(u, v)};
+
+          if (!masked || (masked && albedo.a >= alpha_cutoff)) {
+            output.at(x, y) = color(albedo);
+            depth.at(x, y) = z;
+          }
         }
       }
 
