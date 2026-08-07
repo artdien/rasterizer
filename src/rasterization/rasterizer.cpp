@@ -330,7 +330,7 @@ auto Rasterizer::bin_triangles() -> void {
   const auto remainder {triangles_total % threads_.capacity()};
 
   bins_.reserve(triangles_total);
-  tiles_.reserve(triangles_total);
+  tiles_.resize(triangles_total);
 
   auto begin {0u};
   std::atomic<u32> count {0u};
