@@ -17,7 +17,7 @@ public:
   /// @brief Creates a thread pool with a given number of worker threads.
   ///
   /// @param capacity Number of threads to create in the thread pool.
-  ThreadPool(u32 capacity = std::max(1u, std::thread::hardware_concurrency() - 1));
+  ThreadPool(u32 capacity);
 
   ThreadPool(const ThreadPool&) = delete;
   ThreadPool(ThreadPool&&) = delete;

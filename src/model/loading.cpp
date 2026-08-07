@@ -241,20 +241,22 @@ auto load_model(const std::filesystem::path& filepath, bool convert_to_world_coo
     });
   }
 
+  return model;
+}
+
+auto print_model_info(const Model& model) -> void {
   const auto primitives {model.meshes | std::views::transform(&Mesh::primitives) | std::views::join};
   const auto primitives_count {std::ranges::distance(primitives)};
   const auto vertices_count {std::ranges::distance(primitives | std::views::transform(&Primitive::positions) | std::views::join)};
   const auto indices_count {std::ranges::distance(primitives | std::views::transform(&Primitive::indices) | std::views::join)};
 
-  std::println("Model '{}' successfully loaded:", filepath.filename().string());
-  std::println("  Number of meshes: {}", model.meshes.size());
-  std::println("  Number of primitives: {}", primitives_count);
-  std::println("  Number of vertices: {}", vertices_count);
-  std::println("  Number of indices: {}", indices_count);
-  std::println("  Number of materials: {}", model.materials.size());
-  std::println("  Number of textures: {}", model.textures.size());
-
-  return model;
+  std::println("MODEL INFO");
+  std::println("  Meshes: {}", model.meshes.size());
+  std::println("  Primitives: {}", primitives_count);
+  std::println("  Vertices: {}", vertices_count);
+  std::println("  Indices: {}", indices_count);
+  std::println("  Materials: {}", model.materials.size());
+  std::println("  Textures: {}", model.textures.size());
 }
 
 } // namespace rasterizer::model

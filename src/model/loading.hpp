@@ -29,4 +29,11 @@ namespace rasterizer::model {
 ///       Although a file requiring instancing might load without errors being thrown, the result will be incorrect.
 auto load_model(const std::filesystem::path& filepath, bool convert_to_world_coordinates = true) -> Model;
 
+/// @brief Prints summary information about the given model to standard output.
+///
+/// Outputs the number of meshes, primitives, vertices, indices, materials, and textures.
+///
+/// @param model Loaded model to inspect.
+auto print_model_info(const Model& model) -> void;
+
 } // namespace rasterizer::model

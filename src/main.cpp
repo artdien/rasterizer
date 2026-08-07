@@ -1,5 +1,7 @@
+#include <iostream>
 #include <print>
 #include <string_view>
+#include <thread>
 
 #include "model/loading.hpp"
 #include "platform/types.hpp"
@@ -18,6 +20,14 @@ namespace {
 constexpr auto WINDOW_TITLE {std::string_view {"Software Rasterizer"}};
 constexpr auto UPDATE_TIME_MS {1000.0 / 30.0};
 constexpr auto MAX_LAG_MS {100.0};
+constexpr auto OUTPUT_INTERVAL_MS {1000.0};
+
+// Leave one core free for the OS to prevent freezes or lags
+const auto MAX_THREADS {
+    std::thread::hardware_concurrency() > 0u                     //
+        ? std::max(1u, std::thread::hardware_concurrency() - 1u) //
+        : 1u                                                     //
+};
 
 auto process_input(Window* window, Camera* camera, const KeyboardInput& keyboard, f32 dt) -> void {
   if (keyboard.key == "esc") {
@@ -51,6 +61,12 @@ auto main(i32 argc, c8* argv[]) -> int {
   const auto width {parse_cli_argument_u32(argc, argv, "-width").value_or(1920u)};
   const auto height {parse_cli_argument_u32(argc, argv, "-height").value_or(1080u)};
   const auto filepath {parse_cli_argument_str(argc, argv, "-file").value_or("")};
+  const auto threads {parse_cli_argument_u32(argc, argv, "-threads").value_or(MAX_THREADS)};
+  const auto tile_size {parse_cli_argument_u32(argc, argv, "-tile").value_or(16u)};
+  const auto position_x {parse_cli_argument_f32(argc, argv, "-x").value_or(0.0f)};
+  const auto position_y {parse_cli_argument_f32(argc, argv, "-y").value_or(0.0f)};
+  const auto position_z {parse_cli_argument_f32(argc, argv, "-z").value_or(0.0f)};
+  const auto info {parse_cli_flag(argc, argv, "-info")};
 
   if (filepath == "") {
     std::println("Use -file <path> to provide a filepath to a .gltf or .glb file");
@@ -60,20 +76,53 @@ auto main(i32 argc, c8* argv[]) -> int {
   const auto model {load_model(filepath)};
 
   auto window {Window {width, height, std::string(WINDOW_TITLE)}};
-  auto rasterizer {Rasterizer {width, height}};
-  auto camera {Camera {width, height}};
+  auto rasterizer {Rasterizer {width, height, threads, tile_size}};
+  auto camera {Camera {width, height, {position_x, position_y, position_z}}};
 
-  auto lag {0.0};
+  if (info) {
+    std::println("PARAMETERS");
+    std::println("  Width: {}", width);
+    std::println("  Height: {}", height);
+    std::println("  Threads: {}", threads);
+    std::println("  Tile Size: {}", tile_size);
+    std::println("  Initial Camera Position: ({:.2f}, {:.2f}, {:.2f})", position_x, position_y, position_z);
+    std::print("\n");
+
+    print_model_info(model);
+    std::print("\n");
+
+    std::println("FRAME DATA");
+    std::print("  Calculating ...");
+    std::cout.flush();
+  }
+
+  auto lag_ms {0.0};
+  auto last_output_time_ms {0.0};
 
   window.open([&](KeyboardInput keyboard, f64 elapsed_time_ms) {
     process_input(&window, &camera, keyboard, static_cast<f32>(elapsed_time_ms / 1000.0f));
 
-    lag = std::min(lag + elapsed_time_ms, MAX_LAG_MS);
-    while (lag >= UPDATE_TIME_MS) {
+    lag_ms = std::min(lag_ms + elapsed_time_ms, MAX_LAG_MS);
+    while (lag_ms >= UPDATE_TIME_MS) {
       rasterizer.rasterize(window.buffer(), model, camera.view_matrix(), camera.projection_matrix());
-      lag -= UPDATE_TIME_MS;
+      lag_ms -= UPDATE_TIME_MS;
+    }
+
+    if (info) {
+      last_output_time_ms += elapsed_time_ms;
+
+      if (last_output_time_ms >= OUTPUT_INTERVAL_MS) {
+        // Add spacing at end to avoid only partially overwritten output from last frame due to different frame or lag times
+        std::print("\r  Frame Time: {:.2f}ms | Lag: {:.2f}ms      ", elapsed_time_ms, lag_ms);
+        std::cout.flush();
+        last_output_time_ms = 0.0;
+      }
     }
   });
+
+  if (info) {
+    std::print("\n");
+  }
 
   return 0;
 }

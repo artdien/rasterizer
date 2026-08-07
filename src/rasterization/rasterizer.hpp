@@ -23,10 +23,11 @@ public:
   ///
   /// @param width     Width of depth buffer.
   /// @param height    Height of depth buffer.
+  /// @param threads   Number of threads to use for parallelized rasterization.
   /// @param tile_size The dimension of each square tile in pixels.
   ///
   /// @note Width and height of depth buffer must match the width and height of output buffer used for rasterizing.
-  Rasterizer(u32 width, u32 height, u32 tile_size = 16);
+  Rasterizer(u32 width, u32 height, u32 threads, u32 tile_size = 16);
 
   Rasterizer(const Rasterizer&) = delete;
   Rasterizer(Rasterizer&&) = delete;

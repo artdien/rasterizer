@@ -188,7 +188,8 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
 
 } // namespace
 
-Rasterizer::Rasterizer(u32 width, u32 height, u32 tile_size) : tile_size_ {tile_size}, depth_ {width, height}, bins_ {width, height, tile_size}, threads_ {} {}
+Rasterizer::Rasterizer(u32 width, u32 height, u32 threads, u32 tile_size)
+    : tile_size_ {tile_size}, depth_ {width, height}, bins_ {width, height, tile_size}, threads_ {threads} {}
 
 auto Rasterizer::rasterize(buffer::FramebufferView<u32> output, const model::Model& model, const glm::mat4& view, const glm::mat4& projection) -> void {
   bins_.reset();

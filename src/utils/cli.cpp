@@ -35,4 +35,30 @@ auto parse_cli_argument_u32(i32 argc, c8* argv[], std::string_view argument) -> 
   return {};
 }
 
+auto parse_cli_argument_f32(i32 argc, c8* argv[], std::string_view argument) -> std::optional<f32> {
+  const auto arguments {std::span {argv, argv + argc}};
+  const auto arguments_end {std::ranges::end(arguments)};
+
+  if (auto it {std::ranges::find(arguments, argument)}; it != arguments_end && ++it != arguments_end) {
+    const auto as_string {std::string_view {*it}};
+    auto parsed {f32 {}};
+
+    if (const auto result {std::from_chars(as_string.data(), as_string.data() + as_string.size(), parsed)}; result.ec != std::errc::invalid_argument) {
+      return parsed;
+    }
+  }
+
+  return {};
+}
+
+auto parse_cli_flag(i32 argc, c8* argv[], std::string_view flag) -> bool {
+  const auto arguments {std::span {argv, argv + argc}};
+
+  if (std::ranges::find(arguments, flag) != std::ranges::end(arguments)) {
+    return true;
+  }
+
+  return false;
+}
+
 } // namespace rasterizer::utils
