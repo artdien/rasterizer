@@ -79,6 +79,8 @@ auto main(i32 argc, c8* argv[]) -> int {
   auto rasterizer {Rasterizer {width, height, threads, tile_size}};
   auto camera {Camera {width, height, {position_x, position_y, position_z}}};
 
+  const auto lighting {Lighting {.hemispherical = {.ground = {0.2f, 0.2f, 0.2f}, .sky = {0.2f, 0.5f, 0.8f}}}};
+
   if (info) {
     std::println("PARAMETERS");
     std::println("  Width: {}", width);
@@ -104,7 +106,7 @@ auto main(i32 argc, c8* argv[]) -> int {
 
     lag_ms = std::min(lag_ms + elapsed_time_ms, MAX_LAG_MS);
     while (lag_ms >= UPDATE_TIME_MS) {
-      rasterizer.rasterize(window.buffer(), model, camera.view_matrix(), camera.projection_matrix());
+      rasterizer.rasterize(window.buffer(), model, lighting, camera.view_matrix(), camera.projection_matrix());
       lag_ms -= UPDATE_TIME_MS;
     }
 

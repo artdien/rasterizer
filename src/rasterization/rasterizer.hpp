@@ -3,6 +3,7 @@
 #include <glm/mat4x4.hpp>
 
 #include "buffer/framebuffer.hpp"
+#include "model/lighting.hpp"
 #include "model/model.hpp"
 #include "rasterization/bin.hpp"
 #include "rasterization/thread_pool.hpp"
@@ -44,9 +45,11 @@ public:
   ///
   /// @param output     Framebuffer where the rasterized image will be stored.
   /// @param model      The 3D model to be rasterized.
+  /// @param lighting   Lighting parameters for shading.
   /// @param view       View matrix defining the camera position and orientation.
   /// @param projection Projection matrix defining the perspective or orthographic projection.
-  auto rasterize(buffer::FramebufferView<u32> output, const model::Model& model, const glm::mat4& view, const glm::mat4& projection) -> void;
+  auto rasterize(buffer::FramebufferView<u32> output, const model::Model& model, const model::Lighting& lighting, const glm::mat4& view,
+                 const glm::mat4& projection) -> void;
 
 private:
   u32 tile_size_;
@@ -60,7 +63,7 @@ private:
 
   auto process_triangles(const model::Model& model, const glm::mat4& view, const glm::mat4& projection) -> void;
   auto bin_triangles() -> void;
-  auto rasterize_tiles(buffer::FramebufferView<u32> output) -> void;
+  auto rasterize_tiles(buffer::FramebufferView<u32> output, const model::Lighting& lighting) -> void;
 };
 
 } // namespace rasterizer::rasterization

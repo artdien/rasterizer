@@ -12,13 +12,14 @@ namespace rasterizer::rasterization {
 
 namespace {
 
+constexpr auto WORLD_UP {glm::vec3 {0.0f, 1.0f, 0.0f}}; // glTF specification assumes positive Y-axis as world up vector
+
 struct Extent {
   glm::vec2 min;
   glm::vec2 max;
 };
 
-auto color(glm::vec4 value) -> u32 {
-  // Alpha value not required, since output buffer doesn't support it
+auto color(glm::vec3 value) -> u32 {
   const auto r {static_cast<u32>(glm::clamp(value.r * 255.0f, 0.0f, 255.0f))};
   const auto g {static_cast<u32>(glm::clamp(value.g * 255.0f, 0.0f, 255.0f))};
   const auto b {static_cast<u32>(glm::clamp(value.b * 255.0f, 0.0f, 255.0f))};
@@ -145,7 +146,8 @@ auto overlapping_tiles(const Triangle& triangle, u32 tile_size) -> Tile {
   };
 }
 
-auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::FramebufferView<f32> depth, const Triangle& triangle, const Tile& tile) -> void {
+auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::FramebufferView<f32> depth, const Triangle& triangle, const Tile& tile,
+                        const model::Lighting& lighting) -> void {
   // We need to calculate the intersection between the tile coordinates and the screen extent of the triangle,
   // otherwise we might rasterize outside the tile if the triangle is overlapping multiple tiles.
   const auto x_min {std::max(triangle.min.x, tile.min.x)};
@@ -176,6 +178,7 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
         const auto f2 {r * e2};
 
         if (auto z {f0 * triangle.v0.position.z + f1 * triangle.v1.position.z + f2 * triangle.v2.position.z}; z < depth.at(x, y)) {
+          const auto normal {glm::normalize(f0 * triangle.v0.normal + f1 * triangle.v1.normal + f2 * triangle.v2.normal)};
           const auto u {f0 * triangle.v0.uv.s + f1 * triangle.v1.uv.s + f2 * triangle.v2.uv.s};
           const auto v {f0 * triangle.v0.uv.t + f1 * triangle.v1.uv.t + f2 * triangle.v2.uv.t};
 
@@ -183,8 +186,11 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
           const auto alpha_cutoff {triangle.material->alpha_cutoff};
           const auto albedo {triangle.material->albedo->sample(u, v)};
 
+          const auto weight {glm::dot(normal, WORLD_UP) * 0.5f + 0.5f};
+          const auto ambient {glm::mix(lighting.hemispherical.ground, lighting.hemispherical.sky, weight)};
+
           if (!masked || (masked && albedo.a >= alpha_cutoff)) {
-            output.at(x, y) = color(albedo);
+            output.at(x, y) = color(glm::vec3 {albedo} * ambient);
             depth.at(x, y) = z;
           }
         }
@@ -206,7 +212,8 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
 Rasterizer::Rasterizer(u32 width, u32 height, u32 threads, u32 tile_size)
     : tile_size_ {tile_size}, depth_ {width, height}, bins_ {width, height, tile_size}, threads_ {threads} {}
 
-auto Rasterizer::rasterize(buffer::FramebufferView<u32> output, const model::Model& model, const glm::mat4& view, const glm::mat4& projection) -> void {
+auto Rasterizer::rasterize(buffer::FramebufferView<u32> output, const model::Model& model, const model::Lighting& lighting, const glm::mat4& view,
+                           const glm::mat4& projection) -> void {
   bins_.reset();
   triangles_.reset();
   threads_.reset();
@@ -216,7 +223,7 @@ auto Rasterizer::rasterize(buffer::FramebufferView<u32> output, const model::Mod
 
   process_triangles(model, view, projection);
   bin_triangles();
-  rasterize_tiles(output);
+  rasterize_tiles(output, lighting);
 }
 
 auto Rasterizer::process_triangles(const model::Model& model, const glm::mat4& view, const glm::mat4& projection) -> void {
@@ -399,7 +406,7 @@ auto Rasterizer::bin_triangles() -> void {
   threads_.sync();
 }
 
-auto Rasterizer::rasterize_tiles(buffer::FramebufferView<u32> output) -> void {
+auto Rasterizer::rasterize_tiles(buffer::FramebufferView<u32> output, const model::Lighting& lighting) -> void {
   const auto tiles_x {bins_.tiles_x()};
   const auto tiles_y {bins_.tiles_y()};
   const auto stride {threads_.capacity()};
@@ -417,7 +424,7 @@ auto Rasterizer::rasterize_tiles(buffer::FramebufferView<u32> output) -> void {
             const auto y_max {std::min(y_min + tile_size_, output.height())};
 
             for (auto idx : bins_.bin(tx, ty)) {
-              rasterize_triangle(output, depth_.view(), triangles_[idx], {.min = {x_min, y_min}, .max = {x_max, y_max}});
+              rasterize_triangle(output, depth_.view(), triangles_[idx], {.min = {x_min, y_min}, .max = {x_max, y_max}}, lighting);
             }
           }
         },
