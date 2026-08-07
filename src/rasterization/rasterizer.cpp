@@ -89,10 +89,10 @@ auto clip(const glm::vec4& p0, const glm::vec4& p1, const glm::vec4& p2) -> std:
   // All vertices are visible, i.e. inside view frustum.
   // In this case we already calculated the screen extent above and can return it.
   if (visibility_count == 6) {
-    return std::make_optional(Extent {
+    return Extent {
         .min = {x_min, y_min},
         .max = {x_max, y_max},
-    });
+    };
   }
 
   // -- CASE 3 --
@@ -121,10 +121,10 @@ auto clip(const glm::vec4& p0, const glm::vec4& p1, const glm::vec4& p2) -> std:
   update_extent_invisible_vertices(p1);
   update_extent_invisible_vertices(p2);
 
-  return std::make_optional(Extent {
+  return Extent {
       .min = {x_min, y_min},
       .max = {x_max, y_max},
-  });
+  };
 }
 
 auto overlapping_tiles(const Triangle& triangle, u32 tile_size) -> Tile {

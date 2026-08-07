@@ -1,7 +1,6 @@
 #pragma once
 
 #include <optional>
-#include <string>
 #include <string_view>
 
 #include "platform/types.hpp"
@@ -18,7 +17,7 @@ namespace rasterizer::utils {
 /// @param argument The key to search for (e.g. "-file").
 ///
 /// @return std::optional<std::string> The value following the key if found. Otherwise std::nullopt.
-auto parse_cli_argument_str(i32 argc, c8* argv[], std::string_view argument) -> std::optional<std::string>;
+auto parse_cli_argument_str(i32 argc, c8* argv[], std::string_view argument) -> std::optional<std::string_view>;
 
 /// @brief Parses a unsigned integer value from the command line arguments following a specific key.
 ///
