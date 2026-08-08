@@ -29,6 +29,9 @@ const auto MAX_THREADS {
         : 1u                                                     //
 };
 
+constexpr auto GROUND_COLOR {glm::vec3 {0.2f, 0.2f, 0.2f}};
+constexpr auto SKY_COLOR {glm::vec3 {0.2f, 0.5f, 0.8f}};
+
 auto process_input(Window* window, Camera* camera, const KeyboardInput& keyboard, f32 dt) -> void {
   if (keyboard.key == "esc") {
     window->close();
@@ -74,12 +77,16 @@ auto main(i32 argc, c8* argv[]) -> int {
   }
 
   const auto model {load_model(filepath)};
+  auto lighting {load_lighting(filepath)};
+
+  // glTF doesn't support hemispherical lighting,
+  // thus we set some pre-defined values here.
+  lighting.hemispherical.ground = GROUND_COLOR;
+  lighting.hemispherical.sky = SKY_COLOR;
 
   auto window {Window {width, height, std::string(WINDOW_TITLE)}};
   auto rasterizer {Rasterizer {width, height, threads, tile_size}};
   auto camera {Camera {width, height, {position_x, position_y, position_z}}};
-
-  const auto lighting {Lighting {.hemispherical = {.ground = {0.2f, 0.2f, 0.2f}, .sky = {0.2f, 0.5f, 0.8f}}}};
 
   if (info) {
     std::println("PARAMETERS");
@@ -106,7 +113,7 @@ auto main(i32 argc, c8* argv[]) -> int {
 
     lag_ms = std::min(lag_ms + elapsed_time_ms, MAX_LAG_MS);
     while (lag_ms >= UPDATE_TIME_MS) {
-      rasterizer.rasterize(window.buffer(), model, lighting, camera.view_matrix(), camera.projection_matrix());
+      rasterizer.rasterize(window.buffer(), model, lighting, camera);
       lag_ms -= UPDATE_TIME_MS;
     }
 

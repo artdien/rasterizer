@@ -31,6 +31,10 @@ auto Camera::projection_matrix() const -> glm::mat4 {
   return glm::mat4 {glm::perspective(glm::radians(VERTICAL_FIELD_OF_VIEW), aspect_ratio_, NEAR_PLANE, FAR_PLANE)};
 }
 
+auto Camera::position() const -> glm::vec3 {
+  return position_;
+}
+
 auto Camera::move_forward(f32 dt) -> void {
   position_ += front_ * MOVEMENT_SPEED * dt;
 }

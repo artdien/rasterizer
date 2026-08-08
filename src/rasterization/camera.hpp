@@ -26,6 +26,11 @@ public:
   /// @return The 4x4 projection transformation matrix.
   auto projection_matrix() const -> glm::mat4;
 
+  /// @brief Returns the current camera position in world space.
+  ///
+  /// @return The position as 3D vector.
+  auto position() const -> glm::vec3;
+
   /// @brief Moves the camera forward along its local Z-axis.
   ///
   /// @param dt Delta time for smooth movement.
@@ -46,12 +51,12 @@ public:
   /// @param dt Delta time for smooth movement.
   auto move_right(f32 dt) -> void;
 
-  /// @brief Moves the camera up along the world Y-axis.
+  /// @brief Moves the camera up along its local up axis.
   ///
   /// @param dt Delta time for smooth movement.
   auto move_up(f32 dt) -> void;
 
-  /// @brief Moves the camera down along the world Y-axis.
+  /// @brief Moves the camera down along its local up axis.
   ///
   /// @param dt Delta time for smooth movement.
   auto move_down(f32 dt) -> void;

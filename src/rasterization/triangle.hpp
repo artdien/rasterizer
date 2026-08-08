@@ -15,13 +15,14 @@ namespace rasterizer::rasterization {
 
 struct Vertex {
   alignas(16) glm::vec4 position;
+  alignas(16) glm::vec3 position_world;
   alignas(16) glm::vec3 normal;
   alignas(16) glm::vec3 edge;
   alignas(8) glm::vec2 uv;
 };
 
 static_assert(alignof(Vertex) == 16);
-static_assert(sizeof(Vertex) == 64);
+static_assert(sizeof(Vertex) == 80);
 
 struct alignas(std::hardware_constructive_interference_size) Triangle {
   Vertex v0, v1, v2;
@@ -30,7 +31,7 @@ struct alignas(std::hardware_constructive_interference_size) Triangle {
 };
 
 static_assert(alignof(Triangle) >= 64);
-static_assert(sizeof(Triangle) == 256);
+static_assert(sizeof(Triangle) == 320);
 
 class TrianglePool {
 public:

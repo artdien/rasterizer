@@ -67,8 +67,13 @@ private:
 };
 
 struct Material {
-  const Texture* albedo;
   glm::vec4 base;
+
+  const Texture* albedo;
+  const Texture* metallic_roughness;
+
+  f32 metallic;
+  f32 roughness;
   f32 alpha_cutoff;
   bool masked;
 };

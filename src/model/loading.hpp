@@ -2,6 +2,7 @@
 
 #include <filesystem>
 
+#include "model/lighting.hpp"
 #include "model/model.hpp"
 
 namespace rasterizer::model {
@@ -28,6 +29,20 @@ namespace rasterizer::model {
 /// @note Instancing is currently not supported.
 ///       Although a file requiring instancing might load without errors being thrown, the result will be incorrect.
 auto load_model(const std::filesystem::path& filepath, bool convert_to_world_coordinates = true) -> Model;
+
+/// @brief Loads lighting information from a glTF (.gltf or .glb) file using the KHR_lights_punctual extension.
+///
+/// Currently, only directional lights are supported, other light types (point, spot) are ignored.
+/// The hemispherical lighting data remains unpopulated.
+///
+/// @param filepath Absolute or relative path to the .gltf or .glb file.
+///
+/// @return A Lighting structure containing the parsed light data.
+///
+/// @throws std::runtime_error if the file is missing or corrupted.
+///
+/// @note If multiple directional lights are present, only one will be used.
+auto load_lighting(const std::filesystem::path& filepath) -> Lighting;
 
 /// @brief Prints summary information about the given model to standard output.
 ///

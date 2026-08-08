@@ -32,7 +32,7 @@ auto load_file(const std::filesystem::path& filepath) -> fastgltf::Asset {
     throw std::runtime_error(std::format("File '{}' could not be read", filepath.filename().string()));
   }
 
-  auto parser {fastgltf::Parser {}};
+  auto parser {fastgltf::Parser {fastgltf::Extensions::KHR_lights_punctual}};
   auto asset {parser.loadGltf(filebuffer.get(), filepath.parent_path(),
                               fastgltf::Options::GenerateMeshIndices | fastgltf::Options::LoadExternalBuffers | fastgltf::Options::LoadExternalImages)};
   if (asset.error() != fastgltf::Error::None) {
@@ -129,13 +129,18 @@ auto load_material(const std::vector<Texture>& textures, const fastgltf::Materia
   material_.base.z = material.pbrData.baseColorFactor.z();
   material_.base.w = material.pbrData.baseColorFactor.w();
 
-  // For now, we only support albedo textures
-  if (const auto& idx {material.pbrData.baseColorTexture}; idx.has_value()) {
-    material_.albedo = &textures[idx.value().textureIndex];
+  if (const auto& info {material.pbrData.baseColorTexture}; info.has_value()) {
+    material_.albedo = &textures[info.value().textureIndex];
   }
 
-  material_.masked = material.alphaMode == fastgltf::AlphaMode::Mask;
+  if (const auto& info {material.pbrData.metallicRoughnessTexture}; info.has_value()) {
+    material_.metallic_roughness = &textures[info.value().textureIndex];
+  }
+
+  material_.metallic = material.pbrData.metallicFactor;
+  material_.roughness = material.pbrData.roughnessFactor;
   material_.alpha_cutoff = material.alphaCutoff;
+  material_.masked = material.alphaMode == fastgltf::AlphaMode::Mask;
 
   return material_;
 }
@@ -245,6 +250,37 @@ auto load_model(const std::filesystem::path& filepath, bool convert_to_world_coo
   }
 
   return model;
+}
+
+auto load_lighting(const std::filesystem::path& filepath) -> Lighting {
+  const auto asset {load_file(filepath)};
+
+  auto lighting {Lighting {}};
+
+  fastgltf::iterateSceneNodes(asset, 0u, fastgltf::math::fmat4x4 {}, [&](const fastgltf::Node& node, const fastgltf::math::fmat4x4& matrix) {
+    if (const auto& idx {node.lightIndex}; idx.has_value()) {
+      const auto& light {asset.lights[idx.value()]};
+
+      const auto row_1 {matrix.row(0)};
+      const auto row_2 {matrix.row(1)};
+      const auto row_3 {matrix.row(2)};
+
+      // For now, we only support exactly one directional light.
+      // If more than one directional lights are present, the last one in this iteration wins.
+      if (light.type == fastgltf::LightType::Directional) {
+        const auto direction {glm::vec3 {0.0f, 0.0f, -1.0f}};
+
+        lighting.directional.direction = glm::normalize(glm::vec3 {
+            row_1.x() * direction.x + row_1.y() * direction.y + row_1.z() * direction.z,
+            row_2.x() * direction.x + row_2.y() * direction.y + row_2.z() * direction.z,
+            row_3.x() * direction.x + row_3.y() * direction.y + row_3.z() * direction.z,
+        });
+        lighting.directional.color = {light.color.x(), light.color.y(), light.color.z()};
+      }
+    }
+  });
+
+  return lighting;
 }
 
 auto print_model_info(const Model& model) -> void {

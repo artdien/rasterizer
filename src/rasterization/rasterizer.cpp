@@ -13,6 +13,7 @@ namespace rasterizer::rasterization {
 namespace {
 
 constexpr auto WORLD_UP {glm::vec3 {0.0f, 1.0f, 0.0f}}; // glTF specification assumes positive Y-axis as world up vector
+constexpr auto BASE_REFLECTIVITY {0.04f};               // commonly used base reflectivity for dielectrics
 
 struct Extent {
   glm::vec2 min;
@@ -20,9 +21,12 @@ struct Extent {
 };
 
 auto color(glm::vec3 value) -> u32 {
-  const auto r {static_cast<u32>(glm::clamp(value.r * 255.0f, 0.0f, 255.0f))};
-  const auto g {static_cast<u32>(glm::clamp(value.g * 255.0f, 0.0f, 255.0f))};
-  const auto b {static_cast<u32>(glm::clamp(value.b * 255.0f, 0.0f, 255.0f))};
+  // Convert to sRGB space for correct display
+  value = glm::pow(glm::clamp(value, 0.0f, 1.0f), glm::vec3(1.0f / 2.2f));
+
+  const auto r {static_cast<u32>(value.r * 255.0f)};
+  const auto g {static_cast<u32>(value.g * 255.0f)};
+  const auto b {static_cast<u32>(value.b * 255.0f)};
 
   return (r << 16) | (g << 8) | b;
 }
@@ -147,13 +151,28 @@ auto overlapping_tiles(const Triangle& triangle, u32 tile_size) -> Tile {
 }
 
 auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::FramebufferView<f32> depth, const Triangle& triangle, const Tile& tile,
-                        const model::Lighting& lighting) -> void {
+                        const model::Lighting& lighting, const glm::vec3& camera_position) -> void {
   // We need to calculate the intersection between the tile coordinates and the screen extent of the triangle,
   // otherwise we might rasterize outside the tile if the triangle is overlapping multiple tiles.
   const auto x_min {std::max(triangle.min.x, tile.min.x)};
   const auto x_max {std::min(triangle.max.x, tile.max.x)};
   const auto y_min {std::max(triangle.min.y, tile.min.y)};
   const auto y_max {std::min(triangle.max.y, tile.max.y)};
+
+  // Hoist material and lighting constants to avoid repeated pointer dereferences
+  const auto* material {triangle.material};
+  const auto masked {material->masked};
+  const auto alpha_cutoff {material->alpha_cutoff};
+  const auto base_material {material->base};
+  const auto albedo_material {material->albedo};
+  const auto metallic_material {material->metallic};
+  const auto roughness_material {material->roughness};
+  const auto metallic_roughness_material {material->metallic_roughness};
+
+  const auto L {-lighting.directional.direction};
+  const auto light_color {lighting.directional.color};
+  const auto ground_color {lighting.hemispherical.ground};
+  const auto sky_color {lighting.hemispherical.sky};
 
   const auto E0 {triangle.v0.edge};
   const auto E1 {triangle.v1.edge};
@@ -178,21 +197,59 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
         const auto f2 {r * e2};
 
         if (auto z {f0 * triangle.v0.position.z + f1 * triangle.v1.position.z + f2 * triangle.v2.position.z}; z < depth.at(x, y)) {
+          const auto position {f0 * triangle.v0.position_world + f1 * triangle.v1.position_world + f2 * triangle.v2.position_world};
           const auto normal {glm::normalize(f0 * triangle.v0.normal + f1 * triangle.v1.normal + f2 * triangle.v2.normal)};
           const auto u {f0 * triangle.v0.uv.s + f1 * triangle.v1.uv.s + f2 * triangle.v2.uv.s};
           const auto v {f0 * triangle.v0.uv.t + f1 * triangle.v1.uv.t + f2 * triangle.v2.uv.t};
 
-          const auto masked {triangle.material->masked};
-          const auto alpha_cutoff {triangle.material->alpha_cutoff};
-          const auto albedo {triangle.material->albedo->sample(u, v)};
+          auto base {base_material};
+          if (albedo_material) {
+            const auto sampled {albedo_material->sample(u, v)};
+            // Convert to linear space for correct lighting calculations
+            base *= glm::vec4 {glm::pow(glm::vec3 {sampled}, glm::vec3 {2.2f}), sampled.a};
+          }
+
+          // Alpha cutoff: skip lighting and depth update if the pixel is discarded
+          if (masked && base.a < alpha_cutoff) {
+            e0 += E0.x;
+            e1 += E1.x;
+            e2 += E2.x;
+            continue;
+          }
+
+          auto metallic {metallic_material};
+          auto roughness {roughness_material};
+          if (metallic_roughness_material) {
+            const auto metallic_roughness {metallic_roughness_material->sample(u, v)};
+            metallic *= metallic_roughness.b;
+            roughness *= metallic_roughness.g;
+          }
+
+          const auto base_color {glm::vec3 {base}};
+
+          const auto V {glm::normalize(camera_position - position)};
+          const auto H {glm::normalize(L + V)};
+
+          // -- Ambient Lighting --
 
           const auto weight {glm::dot(normal, WORLD_UP) * 0.5f + 0.5f};
-          const auto ambient {glm::mix(lighting.hemispherical.ground, lighting.hemispherical.sky, weight)};
+          const auto ambient {base_color * glm::mix(ground_color, sky_color, weight)};
 
-          if (!masked || (masked && albedo.a >= alpha_cutoff)) {
-            output.at(x, y) = color(glm::vec3 {albedo} * ambient);
-            depth.at(x, y) = z;
-          }
+          // -- Diffuse Lighting --
+
+          const auto diffuse_coefficient {glm::max(0.0f, glm::dot(normal, L))};
+          const auto diffuse_color {base_color * (1.0f - metallic)};
+          const auto diffuse {diffuse_coefficient * diffuse_color * light_color};
+
+          // -- Specular Lighting --
+
+          const auto specular_exponent {glm::pow(2.0f, 10.0f * (1.0f - roughness)) * 128.0f};
+          const auto specular_coefficient {glm::pow(glm::max(0.0f, glm::dot(normal, H)), specular_exponent)};
+          const auto specular_color {glm::mix(glm::vec3 {BASE_REFLECTIVITY}, base_color, metallic)};
+          const auto specular {specular_coefficient * specular_color * light_color};
+
+          output.at(x, y) = color(ambient + diffuse + specular);
+          depth.at(x, y) = z;
         }
       }
 
@@ -212,8 +269,7 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
 Rasterizer::Rasterizer(u32 width, u32 height, u32 threads, u32 tile_size)
     : tile_size_ {tile_size}, depth_ {width, height}, bins_ {width, height, tile_size}, threads_ {threads} {}
 
-auto Rasterizer::rasterize(buffer::FramebufferView<u32> output, const model::Model& model, const model::Lighting& lighting, const glm::mat4& view,
-                           const glm::mat4& projection) -> void {
+auto Rasterizer::rasterize(buffer::FramebufferView<u32> output, const model::Model& model, const model::Lighting& lighting, const Camera& camera) -> void {
   bins_.reset();
   triangles_.reset();
   threads_.reset();
@@ -221,9 +277,9 @@ auto Rasterizer::rasterize(buffer::FramebufferView<u32> output, const model::Mod
   output.clear(0u);
   depth_.view().clear(std::numeric_limits<f32>::infinity());
 
-  process_triangles(model, view, projection);
+  process_triangles(model, camera.view_matrix(), camera.projection_matrix());
   bin_triangles();
-  rasterize_tiles(output, lighting);
+  rasterize_tiles(output, lighting, camera.position());
 }
 
 auto Rasterizer::process_triangles(const model::Model& model, const glm::mat4& view, const glm::mat4& projection) -> void {
@@ -267,11 +323,15 @@ auto Rasterizer::process_triangles(const model::Model& model, const glm::mat4& v
                 const auto i1 {prim->indices[3u * i + 1u]};
                 const auto i2 {prim->indices[3u * i + 2u]};
 
+                const auto p0_world {glm::vec4 {prim->positions[i0], 1.0f}};
+                const auto p1_world {glm::vec4 {prim->positions[i1], 1.0f}};
+                const auto p2_world {glm::vec4 {prim->positions[i2], 1.0f}};
+
                 // -- Apply View and Projection Transformation --
 
-                const auto p0_clip {transformation * glm::vec4 {prim->positions[i0], 1.0f}};
-                const auto p1_clip {transformation * glm::vec4 {prim->positions[i1], 1.0f}};
-                const auto p2_clip {transformation * glm::vec4 {prim->positions[i2], 1.0f}};
+                const auto p0_clip {transformation * p0_world};
+                const auto p1_clip {transformation * p1_world};
+                const auto p2_clip {transformation * p2_world};
 
                 // -- Transform to Viewport Coordinates --
 
@@ -308,18 +368,21 @@ auto Rasterizer::process_triangles(const model::Model& model, const glm::mat4& v
 
                 const auto v0 {Vertex {
                     .position = p0,
+                    .position_world = p0_world,
                     .normal = prim->normals[i0],
                     .edge = M[0],
                     .uv = prim->texcoords[i0],
                 }};
                 const auto v1 {Vertex {
                     .position = p1,
+                    .position_world = p1_world,
                     .normal = prim->normals[i1],
                     .edge = M[1],
                     .uv = prim->texcoords[i1],
                 }};
                 const auto v2 {Vertex {
                     .position = p2,
+                    .position_world = p2_world,
                     .normal = prim->normals[i2],
                     .edge = M[2],
                     .uv = prim->texcoords[i2],
@@ -406,7 +469,7 @@ auto Rasterizer::bin_triangles() -> void {
   threads_.sync();
 }
 
-auto Rasterizer::rasterize_tiles(buffer::FramebufferView<u32> output, const model::Lighting& lighting) -> void {
+auto Rasterizer::rasterize_tiles(buffer::FramebufferView<u32> output, const model::Lighting& lighting, const glm::vec3& camera_position) -> void {
   const auto tiles_x {bins_.tiles_x()};
   const auto tiles_y {bins_.tiles_y()};
   const auto stride {threads_.capacity()};
@@ -424,7 +487,7 @@ auto Rasterizer::rasterize_tiles(buffer::FramebufferView<u32> output, const mode
             const auto y_max {std::min(y_min + tile_size_, output.height())};
 
             for (auto idx : bins_.bin(tx, ty)) {
-              rasterize_triangle(output, depth_.view(), triangles_[idx], {.min = {x_min, y_min}, .max = {x_max, y_max}}, lighting);
+              rasterize_triangle(output, depth_.view(), triangles_[idx], {.min = {x_min, y_min}, .max = {x_max, y_max}}, lighting, camera_position);
             }
           }
         },
