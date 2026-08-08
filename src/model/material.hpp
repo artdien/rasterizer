@@ -3,6 +3,7 @@
 #include <functional>
 #include <memory>
 
+#include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
 #include "platform/types.hpp"
@@ -68,10 +69,12 @@ private:
 
 struct Material {
   glm::vec4 base;
+  glm::vec3 emissive_factor;
 
   const Texture* albedo;
   const Texture* metallic_roughness;
   const Texture* occlusion;
+  const Texture* emissive;
 
   f32 metallic;
   f32 roughness;

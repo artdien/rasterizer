@@ -143,8 +143,13 @@ auto load_material(const std::vector<Texture>& textures, const fastgltf::Materia
     material_.occlusion_strength = info.value().strength;
   }
 
+  if (const auto& info {material.emissiveTexture}; info.has_value()) {
+    material_.emissive = &textures[info.value().textureIndex];
+  }
+
   material_.metallic = material.pbrData.metallicFactor;
   material_.roughness = material.pbrData.roughnessFactor;
+  material_.emissive_factor = {material.emissiveFactor.x(), material.emissiveFactor.y(), material.emissiveFactor.z()};
   material_.alpha_cutoff = material.alphaCutoff;
   material_.masked = material.alphaMode == fastgltf::AlphaMode::Mask;
 

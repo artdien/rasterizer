@@ -170,6 +170,8 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
   const auto metallic_roughness_material {material->metallic_roughness};
   const auto occlusion_material {material->occlusion};
   const auto occlusion_strength {material->occlusion_strength};
+  const auto emissive_material {material->emissive};
+  const auto emissive_factor {material->emissive_factor};
 
   const auto L_d {-lighting.directional.direction};
   const auto directional_color {lighting.directional.color};
@@ -217,6 +219,11 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
             e1 += E1.x;
             e2 += E2.x;
             continue;
+          }
+
+          auto emissive {emissive_factor};
+          if (emissive_material) {
+            emissive *= glm::vec3 {emissive_material->sample(u, v)};
           }
 
           auto occlusion {1.0f};
@@ -274,7 +281,7 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
             }
           }
 
-          output.at(x, y) = color(ambient + diffuse + specular);
+          output.at(x, y) = color(ambient + diffuse + specular + emissive);
           depth.at(x, y) = z;
         }
       }
