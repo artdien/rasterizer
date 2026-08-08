@@ -71,9 +71,11 @@ struct Material {
 
   const Texture* albedo;
   const Texture* metallic_roughness;
+  const Texture* occlusion;
 
   f32 metallic;
   f32 roughness;
+  f32 occlusion_strength;
   f32 alpha_cutoff;
   bool masked;
 };

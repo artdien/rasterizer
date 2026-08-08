@@ -138,6 +138,11 @@ auto load_material(const std::vector<Texture>& textures, const fastgltf::Materia
     material_.metallic_roughness = &textures[info.value().textureIndex];
   }
 
+  if (const auto& info {material.occlusionTexture}; info.has_value()) {
+    material_.occlusion = &textures[info.value().textureIndex];
+    material_.occlusion_strength = info.value().strength;
+  }
+
   material_.metallic = material.pbrData.metallicFactor;
   material_.roughness = material.pbrData.roughnessFactor;
   material_.alpha_cutoff = material.alphaCutoff;

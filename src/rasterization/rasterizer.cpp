@@ -168,6 +168,8 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
   const auto metallic_material {material->metallic};
   const auto roughness_material {material->roughness};
   const auto metallic_roughness_material {material->metallic_roughness};
+  const auto occlusion_material {material->occlusion};
+  const auto occlusion_strength {material->occlusion_strength};
 
   const auto L_d {-lighting.directional.direction};
   const auto directional_color {lighting.directional.color};
@@ -217,6 +219,11 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
             continue;
           }
 
+          auto occlusion {1.0f};
+          if (occlusion_material) {
+            occlusion = glm::mix(1.0f, occlusion_material->sample(u, v).r, occlusion_strength);
+          }
+
           auto metallic {metallic_material};
           auto roughness {roughness_material};
           if (metallic_roughness_material) {
@@ -240,7 +247,7 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
           // -- Ambient Lighting --
 
           const auto weight {glm::dot(normal, WORLD_UP) * 0.5f + 0.5f};
-          const auto ambient {base_color * glm::mix(ground_color, sky_color, weight)};
+          const auto ambient {base_color * glm::mix(ground_color, sky_color, weight) * occlusion};
 
           // -- Directional Lighting --
 
