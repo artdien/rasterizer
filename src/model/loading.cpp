@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <format>
 #include <iterator>
+#include <limits>
 #include <print>
 #include <ranges>
 #include <stdexcept>
@@ -276,6 +277,13 @@ auto load_lighting(const std::filesystem::path& filepath) -> Lighting {
             row_3.x() * direction.x + row_3.y() * direction.y + row_3.z() * direction.z,
         });
         lighting.directional.color = {light.color.x(), light.color.y(), light.color.z()};
+      } else if (light.type == fastgltf::LightType::Point) {
+        // For point lights we only care about the translation component of the transformation matrix,
+        // as rotating point lights doesn't make sense.
+        const auto position {glm::vec3 {row_1.w(), row_2.w(), row_3.w()}};
+        const auto color {glm::vec3 {light.color.x(), light.color.y(), light.color.z()}};
+
+        lighting.points.emplace_back(position, color, light.range.value_or(std::numeric_limits<f32>::infinity()));
       }
     }
   });

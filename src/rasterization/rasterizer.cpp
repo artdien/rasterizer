@@ -169,8 +169,8 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
   const auto roughness_material {material->roughness};
   const auto metallic_roughness_material {material->metallic_roughness};
 
-  const auto L {-lighting.directional.direction};
-  const auto light_color {lighting.directional.color};
+  const auto L_d {-lighting.directional.direction};
+  const auto directional_color {lighting.directional.color};
   const auto ground_color {lighting.hemispherical.ground};
   const auto sky_color {lighting.hemispherical.sky};
 
@@ -227,26 +227,45 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
 
           const auto base_color {glm::vec3 {base}};
 
+          const auto diffuse_color {base_color * (1.0f - metallic)};
+          const auto specular_color {glm::mix(glm::vec3 {BASE_REFLECTIVITY}, base_color, metallic)};
+          const auto specular_exponent {glm::pow(2.0f, 10.0f * (1.0f - roughness)) * 128.0f};
+
           const auto V {glm::normalize(camera_position - position)};
-          const auto H {glm::normalize(L + V)};
+          const auto H_d {glm::normalize(L_d + V)};
+
+          auto diffuse {glm::vec3 {0.0f}};
+          auto specular {glm::vec3 {0.0f}};
 
           // -- Ambient Lighting --
 
           const auto weight {glm::dot(normal, WORLD_UP) * 0.5f + 0.5f};
           const auto ambient {base_color * glm::mix(ground_color, sky_color, weight)};
 
-          // -- Diffuse Lighting --
+          // -- Directional Lighting --
 
-          const auto diffuse_coefficient {glm::max(0.0f, glm::dot(normal, L))};
-          const auto diffuse_color {base_color * (1.0f - metallic)};
-          const auto diffuse {diffuse_coefficient * diffuse_color * light_color};
+          diffuse += glm::max(0.0f, glm::dot(normal, L_d)) * diffuse_color * directional_color;
+          specular += glm::pow(glm::max(0.0f, glm::dot(normal, H_d)), specular_exponent) * specular_color * directional_color;
 
-          // -- Specular Lighting --
+          // -- Point Lighting --
 
-          const auto specular_exponent {glm::pow(2.0f, 10.0f * (1.0f - roughness)) * 128.0f};
-          const auto specular_coefficient {glm::pow(glm::max(0.0f, glm::dot(normal, H)), specular_exponent)};
-          const auto specular_color {glm::mix(glm::vec3 {BASE_REFLECTIVITY}, base_color, metallic)};
-          const auto specular {specular_coefficient * specular_color * light_color};
+          for (const auto& point : lighting.points) {
+            const auto light {point.position - position};
+            auto distance {glm::length(light)};
+
+            if (distance < point.range) {
+              distance = glm::max(0.01f, distance);
+
+              const auto L_p {light / distance};
+              const auto H_p {glm::normalize(L_p + V)};
+
+              const auto ratio {distance / point.range};
+              const auto attenuation {glm::max(glm::min(1.0f - ratio * ratio * ratio * ratio, 1.0f), 0.0f) / (distance * distance)};
+
+              diffuse += glm::max(0.0f, glm::dot(normal, L_p)) * diffuse_color * point.color * attenuation;
+              specular += glm::pow(glm::max(0.0f, glm::dot(normal, H_p)), specular_exponent) * specular_color * point.color * attenuation;
+            }
+          }
 
           output.at(x, y) = color(ambient + diffuse + specular);
           depth.at(x, y) = z;

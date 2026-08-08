@@ -32,7 +32,7 @@ auto load_model(const std::filesystem::path& filepath, bool convert_to_world_coo
 
 /// @brief Loads lighting information from a glTF (.gltf or .glb) file using the KHR_lights_punctual extension.
 ///
-/// Currently, only directional lights are supported, other light types (point, spot) are ignored.
+/// Currently, only directional lights and point lights are supported, spot lights are ignored.
 /// The hemispherical lighting data remains unpopulated.
 ///
 /// @param filepath Absolute or relative path to the .gltf or .glb file.
