@@ -19,7 +19,7 @@ namespace rasterizer::model {
 ///
 /// @param filepath Absolute or relative path to the .gltf or .glb file.
 /// @param convert_to_world_coordinates If true, traverses the scene graph and bakes all node transformations
-///                                     directly into the vertex positions and normals.
+///                                     directly into the vertex positions, normals, and tangents.
 ///                                     If false, vertices remain in local object space.
 ///
 /// @return A Model structure containing processed meshes, materials, and textures ready for rendering.

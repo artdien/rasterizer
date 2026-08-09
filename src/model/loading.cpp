@@ -23,6 +23,66 @@ namespace rasterizer::model {
 
 namespace {
 
+auto calculate_tangents(Primitive* primitive) -> void {
+
+  // The glTF specification recommends using MikkTSpace to calculate tangents in case they are missing.
+  // However, for simplicity we calculate 'linear' tangents here instead.
+  // For this, we assume that no vertices need to be pre-split (e.g. for shared vertices at mirror seams).
+
+  primitive->tangents.resize(primitive->positions.size());
+
+  for (usize i = 0; i < primitive->indices.size(); i += 3) {
+    // Calculate face tangent
+    const auto i0 {primitive->indices[i]};
+    const auto i1 {primitive->indices[i + 1]};
+    const auto i2 {primitive->indices[i + 2]};
+
+    const auto p0 {primitive->positions[i0]};
+    const auto p1 {primitive->positions[i1]};
+    const auto p2 {primitive->positions[i2]};
+
+    const auto uv0 {primitive->texcoords[i0]};
+    const auto uv1 {primitive->texcoords[i1]};
+    const auto uv2 {primitive->texcoords[i2]};
+
+    const auto edge1 {p1 - p0};
+    const auto edge2 {p2 - p0};
+    const auto duv1 {uv1 - uv0};
+    const auto duv2 {uv2 - uv0};
+
+    const auto denominator {duv1.x * duv2.y - duv2.x * duv1.y};
+    const auto f {std::abs(denominator) < 1e-6f ? 0.0f : 1.0f / denominator};
+    const auto tangent {f * (duv2.y * edge1 - duv1.y * edge2)};
+    const auto bitangent {f * (-duv2.x * edge1 + duv1.x * edge2)};
+
+    const auto face_normal = glm::normalize(glm::cross(edge1, edge2));
+    const auto sign {(glm::dot(glm::cross(face_normal, tangent), bitangent) < 0.0f) ? -1.0f : 1.0f};
+
+    // Accumulate and average calculated tangents and signs
+    primitive->tangents[i0] += glm::vec4 {tangent, sign};
+    primitive->tangents[i1] += glm::vec4 {tangent, sign};
+    primitive->tangents[i2] += glm::vec4 {tangent, sign};
+  }
+
+  // Gram-Schmidt orthogonalization and normalization
+  for (auto i {0u}; i < primitive->tangents.size(); ++i) {
+    const auto normal {primitive->normals[i]};
+    const auto tangent {glm::vec3 {primitive->tangents[i]}};
+    const auto sign {primitive->tangents[i].w >= 0.0f ? 1.0f : -1.0f};
+
+    if (const auto orthogonal_tangent {tangent - normal * glm::dot(normal, tangent)}; glm::length(orthogonal_tangent) > 1e-6f) {
+      primitive->tangents[i] = glm::vec4 {glm::normalize(orthogonal_tangent), sign};
+    } else {
+      auto fallback {glm::vec3 {1.0f, 0.0f, 0.0f}};
+      if (std::abs(glm::dot(normal, fallback)) > 0.9f) {
+        fallback = {0.0f, 1.0f, 0.0f};
+      }
+
+      primitive->tangents[i] = glm::vec4 {glm::normalize(fallback - normal * glm::dot(normal, fallback)), sign};
+    }
+  }
+}
+
 auto load_file(const std::filesystem::path& filepath) -> fastgltf::Asset {
   if (!std::filesystem::exists(filepath)) {
     throw std::runtime_error(std::format("File does not exist: {}", filepath.string()));
@@ -138,6 +198,11 @@ auto load_material(const std::vector<Texture>& textures, const fastgltf::Materia
     material_.metallic_roughness = &textures[info.value().textureIndex];
   }
 
+  if (const auto& info {material.normalTexture}; info.has_value()) {
+    material_.normal = &textures[info.value().textureIndex];
+    material_.normal_scale = info.value().scale;
+  }
+
   if (const auto& info {material.occlusionTexture}; info.has_value()) {
     material_.occlusion = &textures[info.value().textureIndex];
     material_.occlusion_strength = info.value().strength;
@@ -170,7 +235,9 @@ auto load_mesh(const fastgltf::Asset& asset, const std::vector<Material>& materi
   auto mesh_ {Mesh {}};
 
   for (const auto& primitive : mesh.primitives) {
-    Primitive primitive_;
+    auto primitive_ {Primitive {}};
+
+    auto missing_tangents {false};
 
     if (const auto* it {primitive.findAttribute("POSITION")}; it != std::end(primitive.attributes)) {
       load_attributes(asset, it->accessorIndex, &primitive_.positions);
@@ -182,6 +249,12 @@ auto load_mesh(const fastgltf::Asset& asset, const std::vector<Material>& materi
       load_attributes(asset, it->accessorIndex, &primitive_.normals);
     } else {
       throw std::runtime_error(std::format("Mesh '{}' is missing normal attributes", mesh.name));
+    }
+
+    if (const auto* it {primitive.findAttribute("TANGENT")}; it != std::end(primitive.attributes)) {
+      load_attributes(asset, it->accessorIndex, &primitive_.tangents);
+    } else {
+      missing_tangents = true;
     }
 
     if (const auto* it {primitive.findAttribute("TEXCOORD_0")}; it != std::end(primitive.attributes)) {
@@ -202,6 +275,10 @@ auto load_mesh(const fastgltf::Asset& asset, const std::vector<Material>& materi
       primitive_.material = &materials[idx.value()];
     } else {
       throw std::runtime_error(std::format("Mesh '{}' is missing material", mesh.name));
+    }
+
+    if (missing_tangents) {
+      calculate_tangents(&primitive_);
     }
 
     mesh_.primitives.emplace_back(std::move(primitive_));
@@ -254,6 +331,20 @@ auto load_model(const std::filesystem::path& filepath, bool convert_to_world_coo
             normal.x = normal_x;
             normal.y = normal_y;
             normal.z = normal_z;
+          }
+
+          for (auto& tangent : primitive.tangents) {
+            const auto row_1 {matrix.row(0)};
+            const auto row_2 {matrix.row(1)};
+            const auto row_3 {matrix.row(2)};
+
+            const auto tangent_x {row_1.x() * tangent.x + row_1.y() * tangent.y + row_1.z() * tangent.z};
+            const auto tangent_y {row_2.x() * tangent.x + row_2.y() * tangent.y + row_2.z() * tangent.z};
+            const auto tangent_z {row_3.x() * tangent.x + row_3.y() * tangent.y + row_3.z() * tangent.z};
+
+            tangent.x = tangent_x;
+            tangent.y = tangent_y;
+            tangent.z = tangent_z;
           }
         }
       }

@@ -13,6 +13,7 @@ struct Primitive {
   std::vector<u32> indices;
   std::vector<glm::vec3> positions;
   std::vector<glm::vec3> normals;
+  std::vector<glm::vec4> tangents;
   std::vector<glm::vec2> texcoords;
 
   const Material* material;

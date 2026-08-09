@@ -172,6 +172,7 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
   const auto occlusion_strength {material->occlusion_strength};
   const auto emissive_material {material->emissive};
   const auto emissive_factor {material->emissive_factor};
+  const auto normal_scale {material->normal_scale};
 
   const auto L_d {-lighting.directional.direction};
   const auto directional_color {lighting.directional.color};
@@ -203,6 +204,10 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
         if (auto z {f0 * triangle.v0.position.z + f1 * triangle.v1.position.z + f2 * triangle.v2.position.z}; z < depth.at(x, y)) {
           const auto position {f0 * triangle.v0.position_world + f1 * triangle.v1.position_world + f2 * triangle.v2.position_world};
           const auto normal {glm::normalize(f0 * triangle.v0.normal + f1 * triangle.v1.normal + f2 * triangle.v2.normal)};
+          const auto tangent_signed {f0 * triangle.v0.tangent + f1 * triangle.v1.tangent + f2 * triangle.v2.tangent};
+          const auto tangent {glm::normalize(glm::vec3 {tangent_signed} - normal * glm::dot(normal, glm::vec3 {tangent_signed}))};
+          const auto bitangent {glm::cross(normal, tangent) * tangent_signed.w};
+
           const auto u {f0 * triangle.v0.uv.s + f1 * triangle.v1.uv.s + f2 * triangle.v2.uv.s};
           const auto v {f0 * triangle.v0.uv.t + f1 * triangle.v1.uv.t + f2 * triangle.v2.uv.t};
 
@@ -231,6 +236,14 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
             occlusion = glm::mix(1.0f, occlusion_material->sample(u, v).r, occlusion_strength);
           }
 
+          auto N {normal};
+          if (material->normal) {
+            auto sampled_normal {glm::normalize(glm::vec3 {material->normal->sample(u, v)} * 2.0f - 1.0f)};
+            sampled_normal *= glm::vec3 {normal_scale, normal_scale, 1.0f};
+
+            N = glm::normalize(tangent * sampled_normal.x + bitangent * sampled_normal.y + normal * sampled_normal.z);
+          }
+
           auto metallic {metallic_material};
           auto roughness {roughness_material};
           if (metallic_roughness_material) {
@@ -253,13 +266,13 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
 
           // -- Ambient Lighting --
 
-          const auto weight {glm::dot(normal, WORLD_UP) * 0.5f + 0.5f};
+          const auto weight {glm::dot(N, WORLD_UP) * 0.5f + 0.5f};
           const auto ambient {base_color * glm::mix(ground_color, sky_color, weight) * occlusion};
 
           // -- Directional Lighting --
 
-          diffuse += glm::max(0.0f, glm::dot(normal, L_d)) * diffuse_color * directional_color;
-          specular += glm::pow(glm::max(0.0f, glm::dot(normal, H_d)), specular_exponent) * specular_color * directional_color;
+          diffuse += glm::max(0.0f, glm::dot(N, L_d)) * diffuse_color * directional_color;
+          specular += glm::pow(glm::max(0.0f, glm::dot(N, H_d)), specular_exponent) * specular_color * directional_color;
 
           // -- Point Lighting --
 
@@ -276,8 +289,8 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
               const auto ratio {distance / point.range};
               const auto attenuation {glm::max(glm::min(1.0f - ratio * ratio * ratio * ratio, 1.0f), 0.0f) / (distance * distance)};
 
-              diffuse += glm::max(0.0f, glm::dot(normal, L_p)) * diffuse_color * point.color * attenuation;
-              specular += glm::pow(glm::max(0.0f, glm::dot(normal, H_p)), specular_exponent) * specular_color * point.color * attenuation;
+              diffuse += glm::max(0.0f, glm::dot(N, L_p)) * diffuse_color * point.color * attenuation;
+              specular += glm::pow(glm::max(0.0f, glm::dot(N, H_p)), specular_exponent) * specular_color * point.color * attenuation;
             }
           }
 
@@ -403,6 +416,7 @@ auto Rasterizer::process_triangles(const model::Model& model, const glm::mat4& v
                     .position = p0,
                     .position_world = p0_world,
                     .normal = prim->normals[i0],
+                    .tangent = prim->tangents[i0],
                     .edge = M[0],
                     .uv = prim->texcoords[i0],
                 }};
@@ -410,6 +424,7 @@ auto Rasterizer::process_triangles(const model::Model& model, const glm::mat4& v
                     .position = p1,
                     .position_world = p1_world,
                     .normal = prim->normals[i1],
+                    .tangent = prim->tangents[i1],
                     .edge = M[1],
                     .uv = prim->texcoords[i1],
                 }};
@@ -417,6 +432,7 @@ auto Rasterizer::process_triangles(const model::Model& model, const glm::mat4& v
                     .position = p2,
                     .position_world = p2_world,
                     .normal = prim->normals[i2],
+                    .tangent = prim->tangents[i2],
                     .edge = M[2],
                     .uv = prim->texcoords[i2],
                 }};

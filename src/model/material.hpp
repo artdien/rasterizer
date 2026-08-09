@@ -72,10 +72,12 @@ struct Material {
   glm::vec3 emissive_factor;
 
   const Texture* albedo;
+  const Texture* normal;
   const Texture* metallic_roughness;
   const Texture* occlusion;
   const Texture* emissive;
 
+  f32 normal_scale;
   f32 metallic;
   f32 roughness;
   f32 occlusion_strength;
