@@ -68,19 +68,19 @@ private:
 };
 
 struct Material {
-  glm::vec4 base;
-  glm::vec3 emissive_factor;
-
-  const Texture* albedo;
-  const Texture* normal;
+  const Texture* base_color;
   const Texture* metallic_roughness;
+  const Texture* normal;
   const Texture* occlusion;
   const Texture* emissive;
 
+  glm::vec4 base_color_factor;
+  f32 metallic_factor;
+  f32 roughness_factor;
   f32 normal_scale;
-  f32 metallic;
-  f32 roughness;
   f32 occlusion_strength;
+  glm::vec3 emissive_factor;
+
   f32 alpha_cutoff;
   bool masked;
 };

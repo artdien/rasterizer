@@ -161,18 +161,19 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
 
   // Hoist material and lighting constants to avoid repeated pointer dereferences
   const auto* material {triangle.material};
-  const auto masked {material->masked};
   const auto alpha_cutoff {material->alpha_cutoff};
-  const auto base_material {material->base};
-  const auto albedo_material {material->albedo};
-  const auto metallic_material {material->metallic};
-  const auto roughness_material {material->roughness};
-  const auto metallic_roughness_material {material->metallic_roughness};
-  const auto occlusion_material {material->occlusion};
-  const auto occlusion_strength {material->occlusion_strength};
-  const auto emissive_material {material->emissive};
-  const auto emissive_factor {material->emissive_factor};
+  const auto masked {material->masked};
+  const auto base_color_texture {material->base_color};
+  const auto base_color_factor {material->base_color_factor};
+  const auto metallic_roughness_texture {material->metallic_roughness};
+  const auto metallic_factor {material->metallic_factor};
+  const auto roughness_factor {material->roughness_factor};
+  const auto normal_texture {material->normal};
   const auto normal_scale {material->normal_scale};
+  const auto occlusion_texture {material->occlusion};
+  const auto occlusion_strength {material->occlusion_strength};
+  const auto emissive_texture {material->emissive};
+  const auto emissive_factor {material->emissive_factor};
 
   const auto L_d {-lighting.directional.direction};
   const auto directional_color {lighting.directional.color};
@@ -211,51 +212,51 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
           const auto u {f0 * triangle.v0.uv.s + f1 * triangle.v1.uv.s + f2 * triangle.v2.uv.s};
           const auto v {f0 * triangle.v0.uv.t + f1 * triangle.v1.uv.t + f2 * triangle.v2.uv.t};
 
-          auto base {base_material};
-          if (albedo_material) {
-            const auto sampled {albedo_material->sample(u, v)};
+          auto base_color {base_color_factor};
+          if (base_color_texture) {
+            const auto sampled {base_color_texture->sample(u, v)};
             // Convert to linear space for correct lighting calculations
-            base *= glm::vec4 {glm::pow(glm::vec3 {sampled}, glm::vec3 {2.2f}), sampled.a};
+            base_color *= glm::vec4 {glm::pow(glm::vec3 {sampled}, glm::vec3 {2.2f}), sampled.a};
           }
 
           // Alpha cutoff: skip lighting and depth update if the pixel is discarded
-          if (masked && base.a < alpha_cutoff) {
+          if (masked && base_color.a < alpha_cutoff) {
             e0 += E0.x;
             e1 += E1.x;
             e2 += E2.x;
             continue;
           }
 
-          auto emissive {emissive_factor};
-          if (emissive_material) {
-            emissive *= glm::vec3 {emissive_material->sample(u, v)};
-          }
-
-          auto occlusion {1.0f};
-          if (occlusion_material) {
-            occlusion = glm::mix(1.0f, occlusion_material->sample(u, v).r, occlusion_strength);
-          }
-
           auto N {normal};
-          if (material->normal) {
+          if (normal_texture) {
             auto sampled_normal {glm::normalize(glm::vec3 {material->normal->sample(u, v)} * 2.0f - 1.0f)};
             sampled_normal *= glm::vec3 {normal_scale, normal_scale, 1.0f};
 
             N = glm::normalize(tangent * sampled_normal.x + bitangent * sampled_normal.y + normal * sampled_normal.z);
           }
 
-          auto metallic {metallic_material};
-          auto roughness {roughness_material};
-          if (metallic_roughness_material) {
-            const auto metallic_roughness {metallic_roughness_material->sample(u, v)};
-            metallic *= metallic_roughness.b;
-            roughness *= metallic_roughness.g;
+          auto occlusion {1.0f};
+          if (occlusion_texture) {
+            occlusion = glm::mix(1.0f, occlusion_texture->sample(u, v).r, occlusion_strength);
           }
 
-          const auto base_color {glm::vec3 {base}};
+          auto emissive {emissive_factor};
+          if (emissive_texture) {
+            emissive *= glm::vec3 {emissive_texture->sample(u, v)};
+          }
 
-          const auto diffuse_color {base_color * (1.0f - metallic)};
-          const auto specular_color {glm::mix(glm::vec3 {BASE_REFLECTIVITY}, base_color, metallic)};
+          auto metallic {metallic_factor};
+          auto roughness {roughness_factor};
+          if (metallic_roughness_texture) {
+            const auto sampled {metallic_roughness_texture->sample(u, v)};
+            metallic *= sampled.b;
+            roughness *= sampled.g;
+          }
+
+          const auto albedo {glm::vec3 {base_color}};
+
+          const auto diffuse_color {albedo * (1.0f - metallic)};
+          const auto specular_color {glm::mix(glm::vec3 {BASE_REFLECTIVITY}, albedo, metallic)};
           const auto specular_exponent {glm::pow(2.0f, 10.0f * (1.0f - roughness)) * 128.0f};
 
           const auto V {glm::normalize(camera_position - position)};
@@ -267,7 +268,7 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
           // -- Ambient Lighting --
 
           const auto weight {glm::dot(N, WORLD_UP) * 0.5f + 0.5f};
-          const auto ambient {base_color * glm::mix(ground_color, sky_color, weight) * occlusion};
+          const auto ambient {glm::mix(ground_color, sky_color, weight) * albedo * occlusion};
 
           // -- Directional Lighting --
 

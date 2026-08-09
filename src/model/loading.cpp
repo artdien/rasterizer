@@ -185,13 +185,8 @@ auto load_texture(const fastgltf::Asset& asset, const fastgltf::Texture& texture
 auto load_material(const std::vector<Texture>& textures, const fastgltf::Material& material) -> Material {
   auto material_ {Material {}};
 
-  material_.base.x = material.pbrData.baseColorFactor.x();
-  material_.base.y = material.pbrData.baseColorFactor.y();
-  material_.base.z = material.pbrData.baseColorFactor.z();
-  material_.base.w = material.pbrData.baseColorFactor.w();
-
   if (const auto& info {material.pbrData.baseColorTexture}; info.has_value()) {
-    material_.albedo = &textures[info.value().textureIndex];
+    material_.base_color = &textures[info.value().textureIndex];
   }
 
   if (const auto& info {material.pbrData.metallicRoughnessTexture}; info.has_value()) {
@@ -212,9 +207,22 @@ auto load_material(const std::vector<Texture>& textures, const fastgltf::Materia
     material_.emissive = &textures[info.value().textureIndex];
   }
 
-  material_.metallic = material.pbrData.metallicFactor;
-  material_.roughness = material.pbrData.roughnessFactor;
-  material_.emissive_factor = {material.emissiveFactor.x(), material.emissiveFactor.y(), material.emissiveFactor.z()};
+  material_.base_color_factor = {
+      material.pbrData.baseColorFactor.x(),
+      material.pbrData.baseColorFactor.y(),
+      material.pbrData.baseColorFactor.z(),
+      material.pbrData.baseColorFactor.w(),
+  };
+
+  material_.metallic_factor = material.pbrData.metallicFactor;
+  material_.roughness_factor = material.pbrData.roughnessFactor;
+
+  material_.emissive_factor = {
+      material.emissiveFactor.x(),
+      material.emissiveFactor.y(),
+      material.emissiveFactor.z(),
+  };
+
   material_.alpha_cutoff = material.alphaCutoff;
   material_.masked = material.alphaMode == fastgltf::AlphaMode::Mask;
 
