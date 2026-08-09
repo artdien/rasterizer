@@ -61,10 +61,12 @@ public:
   TextureWrap wrap_t;
 
 private:
-  std::unique_ptr<uc8[], ImageDeleter> data_;
+  std::unique_ptr<f32[]> data_;
   u32 width_;
   u32 height_;
   u32 channels_;
+  f32 scale_u_;
+  f32 scale_v_;
 };
 
 struct Material {
