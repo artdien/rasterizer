@@ -223,12 +223,13 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
 
           const auto position {f0 * triangle.v0.position_world + f1 * triangle.v1.position_world + f2 * triangle.v2.position_world};
           const auto normal {glm::normalize(f0 * triangle.v0.normal + f1 * triangle.v1.normal + f2 * triangle.v2.normal)};
-          const auto tangent_signed {f0 * triangle.v0.tangent + f1 * triangle.v1.tangent + f2 * triangle.v2.tangent};
-          const auto tangent {glm::normalize(glm::vec3 {tangent_signed} - normal * glm::dot(normal, glm::vec3 {tangent_signed}))};
-          const auto bitangent {glm::cross(normal, tangent) * tangent_signed.w};
 
           auto N {normal};
           if (normal_texture) {
+            const auto tangent_signed {f0 * triangle.v0.tangent + f1 * triangle.v1.tangent + f2 * triangle.v2.tangent};
+            const auto tangent {glm::normalize(glm::vec3 {tangent_signed} - normal * glm::dot(normal, glm::vec3 {tangent_signed}))};
+            const auto bitangent {glm::cross(normal, tangent) * tangent_signed.w};
+
             auto sampled_normal {glm::normalize(glm::vec3 {material->normal->sample(u, v)} * 2.0f - 1.0f)};
             sampled_normal *= glm::vec3 {normal_scale, normal_scale, 1.0f};
 
