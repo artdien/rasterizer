@@ -203,12 +203,6 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
         const auto f2 {r * e2};
 
         if (auto z {f0 * triangle.v0.position.z + f1 * triangle.v1.position.z + f2 * triangle.v2.position.z}; z < depth.at(x, y)) {
-          const auto position {f0 * triangle.v0.position_world + f1 * triangle.v1.position_world + f2 * triangle.v2.position_world};
-          const auto normal {glm::normalize(f0 * triangle.v0.normal + f1 * triangle.v1.normal + f2 * triangle.v2.normal)};
-          const auto tangent_signed {f0 * triangle.v0.tangent + f1 * triangle.v1.tangent + f2 * triangle.v2.tangent};
-          const auto tangent {glm::normalize(glm::vec3 {tangent_signed} - normal * glm::dot(normal, glm::vec3 {tangent_signed}))};
-          const auto bitangent {glm::cross(normal, tangent) * tangent_signed.w};
-
           const auto u {f0 * triangle.v0.uv.s + f1 * triangle.v1.uv.s + f2 * triangle.v2.uv.s};
           const auto v {f0 * triangle.v0.uv.t + f1 * triangle.v1.uv.t + f2 * triangle.v2.uv.t};
 
@@ -226,6 +220,12 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
             e2 += E2.x;
             continue;
           }
+
+          const auto position {f0 * triangle.v0.position_world + f1 * triangle.v1.position_world + f2 * triangle.v2.position_world};
+          const auto normal {glm::normalize(f0 * triangle.v0.normal + f1 * triangle.v1.normal + f2 * triangle.v2.normal)};
+          const auto tangent_signed {f0 * triangle.v0.tangent + f1 * triangle.v1.tangent + f2 * triangle.v2.tangent};
+          const auto tangent {glm::normalize(glm::vec3 {tangent_signed} - normal * glm::dot(normal, glm::vec3 {tangent_signed}))};
+          const auto bitangent {glm::cross(normal, tangent) * tangent_signed.w};
 
           auto N {normal};
           if (normal_texture) {
