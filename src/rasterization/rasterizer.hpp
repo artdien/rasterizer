@@ -7,6 +7,7 @@
 #include "model/model.hpp"
 #include "rasterization/bin.hpp"
 #include "rasterization/camera.hpp"
+#include "rasterization/shading.hpp"
 #include "rasterization/thread_pool.hpp"
 #include "rasterization/triangle.hpp"
 
@@ -19,17 +20,19 @@ struct Tile {
   glm::uvec2 max;
 };
 
+template <shading::Shader ShaderType>
 class Rasterizer {
 public:
   /// @brief Constructs a tiled rasterizer.
   ///
+  /// @param shader    Shader instance to use for fragment shading.
   /// @param width     Width of depth buffer.
   /// @param height    Height of depth buffer.
   /// @param threads   Number of threads to use for parallelized rasterization.
   /// @param tile_size The dimension of each square tile in pixels.
   ///
   /// @note Width and height of depth buffer must match the width and height of output buffer used for rasterizing.
-  Rasterizer(u32 width, u32 height, u32 threads, u32 tile_size = 16);
+  Rasterizer(ShaderType shader, u32 width, u32 height, u32 threads, u32 tile_size = 16);
 
   Rasterizer(const Rasterizer&) = delete;
   Rasterizer(Rasterizer&&) = delete;
@@ -44,13 +47,15 @@ public:
   /// 2. Binning:             Assigns triangles to specific tiles in the image grid to improve cache locality.
   /// 3. Rasterization:       Rasterizes pixels within each tile.
   ///
-  /// @param output     Framebuffer where the rasterized image will be stored.
-  /// @param model      The 3D model to be rasterized.
-  /// @param lighting   Lighting data for shading.
-  /// @param camera     Camera object providing position, view matrix, and projection matrix.
+  /// @param output   Framebuffer where the rasterized image will be stored.
+  /// @param model    The 3D model to be rasterized.
+  /// @param lighting Lighting data for shading.
+  /// @param camera   Camera object providing position, view matrix, and projection matrix.
   auto rasterize(buffer::FramebufferView<u32> output, const model::Model& model, const model::Lighting& lighting, const Camera& camera) -> void;
 
 private:
+  ShaderType shader_;
+
   u32 tile_size_;
   buffer::Framebuffer<f32> depth_;
 
@@ -62,7 +67,9 @@ private:
 
   auto process_triangles(const model::Model& model, const glm::mat4& view, const glm::mat4& projection) -> void;
   auto bin_triangles() -> void;
-  auto rasterize_tiles(buffer::FramebufferView<u32> output, const model::Lighting& lighting, const glm::vec3& camera_position) -> void;
+  auto rasterize_tiles(buffer::FramebufferView<u32> output, const model::Lighting& lighting, glm::vec3 camera_position) -> void;
+  auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::FramebufferView<f32> depth, const Triangle& triangle, const Tile& tile,
+                          const model::Lighting& lighting, glm::vec3 camera_position) -> void;
 };
 
 } // namespace rasterizer::rasterization

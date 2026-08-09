@@ -1,26 +1,25 @@
 #include "rasterization/rasterizer.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <optional>
 #include <ranges>
 
 #include <glm/gtx/matrix_major_storage.hpp>
 
 #include "model/material.hpp"
+#include "rasterization/shading.hpp"
 
 namespace rasterizer::rasterization {
 
 namespace {
-
-const auto WORLD_UP {glm::vec3 {0.0f, 1.0f, 0.0f}}; // glTF specification assumes positive Y-axis as world up vector
-constexpr auto BASE_REFLECTIVITY {0.04f};           // commonly used base reflectivity for dielectrics
 
 struct Extent {
   glm::vec2 min;
   glm::vec2 max;
 };
 
-auto color(glm::vec3 value) -> u32 {
+auto linear_to_srgb(glm::vec3 value) -> u32 {
   // Convert to sRGB space for correct display
   value = glm::pow(glm::clamp(value, 0.0f, 1.0f), glm::vec3(1.0f / 2.2f));
 
@@ -150,174 +149,89 @@ auto overlapping_tiles(const Triangle& triangle, u32 tile_size) -> Tile {
   };
 }
 
-auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::FramebufferView<f32> depth, const Triangle& triangle, const Tile& tile,
-                        const model::Lighting& lighting, const glm::vec3& camera_position) -> void {
-  // We need to calculate the intersection between the tile coordinates and the screen extent of the triangle,
-  // otherwise we might rasterize outside the tile if the triangle is overlapping multiple tiles.
-  const auto x_min {std::max(triangle.min.x, tile.min.x)};
-  const auto x_max {std::min(triangle.max.x, tile.max.x)};
-  const auto y_min {std::max(triangle.min.y, tile.min.y)};
-  const auto y_max {std::min(triangle.max.y, tile.max.y)};
+auto prepare_shading_context(const Triangle& triangle, f32 f0, f32 f1, f32 f2, f32 u, f32 v) -> std::optional<shading::ShadingContext> {
+  const auto material {triangle.material};
 
-  // Hoist material and lighting constants to avoid repeated pointer dereferences
-  const auto* material {triangle.material};
-  const auto alpha_cutoff {material->alpha_cutoff};
-  const auto masked {material->masked};
-  const auto base_color_texture {material->base_color};
-  const auto base_color_factor {material->base_color_factor};
-  const auto metallic_roughness_texture {material->metallic_roughness};
-  const auto metallic_factor {material->metallic_factor};
-  const auto roughness_factor {material->roughness_factor};
-  const auto normal_texture {material->normal};
-  const auto normal_scale {material->normal_scale};
-  const auto occlusion_texture {material->occlusion};
-  const auto occlusion_strength {material->occlusion_strength};
-  const auto emissive_texture {material->emissive};
-  const auto emissive_factor {material->emissive_factor};
+  // -- Base Color Texture --
 
-  const auto L_d {-lighting.directional.direction};
-  const auto directional_color {lighting.directional.color};
-  const auto ground_color {lighting.hemispherical.ground};
-  const auto sky_color {lighting.hemispherical.sky};
-
-  const auto E0 {triangle.v0.edge};
-  const auto E1 {triangle.v1.edge};
-  const auto E2 {triangle.v2.edge};
-
-  const glm::vec3 p {(static_cast<f32>(x_min) + 0.5f), (static_cast<f32>(y_min) + 0.5f), 1.0f};
-  auto e0_start {glm::dot(E0, p)};
-  auto e1_start {glm::dot(E1, p)};
-  auto e2_start {glm::dot(E2, p)};
-
-  for (auto y {y_min}; y < y_max; ++y) {
-    auto e0 {e0_start};
-    auto e1 {e1_start};
-    auto e2 {e2_start};
-
-    for (auto x {x_min}; x < x_max; ++x) {
-      if (e0 >= 0 && e1 >= 0 && e2 >= 0) {
-        // Coefficients for perspective-correct interpolation
-        const auto r {1.0f / (e0 + e1 + e2)};
-        const auto f0 {r * e0};
-        const auto f1 {r * e1};
-        const auto f2 {r * e2};
-
-        if (auto z {f0 * triangle.v0.position.z + f1 * triangle.v1.position.z + f2 * triangle.v2.position.z}; z < depth.at(x, y)) {
-          const auto u {f0 * triangle.v0.uv.s + f1 * triangle.v1.uv.s + f2 * triangle.v2.uv.s};
-          const auto v {f0 * triangle.v0.uv.t + f1 * triangle.v1.uv.t + f2 * triangle.v2.uv.t};
-
-          auto base_color {base_color_factor};
-          if (base_color_texture) {
-            const auto sampled {base_color_texture->sample(u, v)};
-            // Convert to linear space for correct lighting calculations
-            base_color *= glm::vec4 {glm::pow(glm::vec3 {sampled}, glm::vec3 {2.2f}), sampled.a};
-          }
-
-          // Alpha cutoff: skip lighting and depth update if the pixel is discarded
-          if (masked && base_color.a < alpha_cutoff) {
-            e0 += E0.x;
-            e1 += E1.x;
-            e2 += E2.x;
-            continue;
-          }
-
-          const auto position {f0 * triangle.v0.position_world + f1 * triangle.v1.position_world + f2 * triangle.v2.position_world};
-          const auto normal {glm::normalize(f0 * triangle.v0.normal + f1 * triangle.v1.normal + f2 * triangle.v2.normal)};
-
-          auto N {normal};
-          if (normal_texture) {
-            const auto tangent_signed {f0 * triangle.v0.tangent + f1 * triangle.v1.tangent + f2 * triangle.v2.tangent};
-            const auto tangent {glm::normalize(glm::vec3 {tangent_signed} - normal * glm::dot(normal, glm::vec3 {tangent_signed}))};
-            const auto bitangent {glm::cross(normal, tangent) * tangent_signed.w};
-
-            auto sampled_normal {glm::normalize(glm::vec3 {material->normal->sample(u, v)} * 2.0f - 1.0f)};
-            sampled_normal *= glm::vec3 {normal_scale, normal_scale, 1.0f};
-
-            N = glm::normalize(tangent * sampled_normal.x + bitangent * sampled_normal.y + normal * sampled_normal.z);
-          }
-
-          auto occlusion {1.0f};
-          if (occlusion_texture) {
-            occlusion = glm::mix(1.0f, occlusion_texture->sample(u, v).r, occlusion_strength);
-          }
-
-          auto emissive {emissive_factor};
-          if (emissive_texture) {
-            emissive *= glm::vec3 {emissive_texture->sample(u, v)};
-          }
-
-          auto metallic {metallic_factor};
-          auto roughness {roughness_factor};
-          if (metallic_roughness_texture) {
-            const auto sampled {metallic_roughness_texture->sample(u, v)};
-            metallic *= sampled.b;
-            roughness *= sampled.g;
-          }
-
-          const auto albedo {glm::vec3 {base_color}};
-
-          const auto diffuse_color {albedo * (1.0f - metallic)};
-          const auto specular_color {glm::mix(glm::vec3 {BASE_REFLECTIVITY}, albedo, metallic)};
-          const auto specular_exponent {glm::pow(2.0f, 10.0f * (1.0f - roughness)) * 128.0f};
-
-          const auto V {glm::normalize(camera_position - position)};
-          const auto H_d {glm::normalize(L_d + V)};
-
-          auto diffuse {glm::vec3 {0.0f}};
-          auto specular {glm::vec3 {0.0f}};
-
-          // -- Ambient Lighting --
-
-          const auto weight {glm::dot(N, WORLD_UP) * 0.5f + 0.5f};
-          const auto ambient {glm::mix(ground_color, sky_color, weight) * albedo * occlusion};
-
-          // -- Directional Lighting --
-
-          diffuse += glm::max(0.0f, glm::dot(N, L_d)) * diffuse_color * directional_color;
-          specular += glm::pow(glm::max(0.0f, glm::dot(N, H_d)), specular_exponent) * specular_color * directional_color;
-
-          // -- Point Lighting --
-
-          for (const auto& point : lighting.points) {
-            const auto light {point.position - position};
-            const auto distance_squared {glm::dot(light, light)};
-
-            if (distance_squared < point.range * point.range) {
-              const auto distance {glm::max(0.01f, glm::sqrt(distance_squared))};
-
-              const auto L_p {light / distance};
-              const auto H_p {glm::normalize(L_p + V)};
-
-              const auto ratio {distance / point.range};
-              const auto attenuation {glm::max(glm::min(1.0f - ratio * ratio * ratio * ratio, 1.0f), 0.0f) / (distance * distance)};
-
-              diffuse += glm::max(0.0f, glm::dot(N, L_p)) * diffuse_color * point.color * attenuation;
-              specular += glm::pow(glm::max(0.0f, glm::dot(N, H_p)), specular_exponent) * specular_color * point.color * attenuation;
-            }
-          }
-
-          output.at(x, y) = color(ambient + diffuse + specular + emissive);
-          depth.at(x, y) = z;
-        }
-      }
-
-      e0 += E0.x;
-      e1 += E1.x;
-      e2 += E2.x;
-    }
-
-    e0_start += E0.y;
-    e1_start += E1.y;
-    e2_start += E2.y;
+  auto base_color {material->base_color_factor};
+  if (material->base_color) {
+    const auto sampled {material->base_color->sample(u, v)};
+    // Convert to linear space for correct lighting calculations
+    base_color *= glm::vec4 {glm::pow(glm::vec3 {sampled}, glm::vec3 {2.2f}), sampled.a};
   }
+
+  // -- Alpha Cutoff --
+
+  // Discard pixel if material is masked and alpha is below threshold
+  if (material->masked && base_color.a < material->alpha_cutoff) {
+    return {};
+  }
+
+  const auto albedo {glm::vec3 {base_color}};
+
+  // -- Normal Texture --
+
+  auto normal {glm::normalize(f0 * triangle.v0.normal + f1 * triangle.v1.normal + f2 * triangle.v2.normal)};
+  if (material->normal) {
+    const auto tangent_signed {f0 * triangle.v0.tangent + f1 * triangle.v1.tangent + f2 * triangle.v2.tangent};
+    const auto tangent {glm::normalize(glm::vec3 {tangent_signed} - normal * glm::dot(normal, glm::vec3 {tangent_signed}))};
+    const auto bitangent {glm::cross(normal, tangent) * tangent_signed.w};
+
+    auto sampled_normal {glm::normalize(glm::vec3 {material->normal->sample(u, v)} * 2.0f - 1.0f)};
+    sampled_normal *= glm::vec3 {material->normal_scale, material->normal_scale, 1.0f};
+
+    normal = glm::normalize(tangent * sampled_normal.x + bitangent * sampled_normal.y + normal * sampled_normal.z);
+  }
+
+  // -- Occlusion Texture --
+
+  auto occlusion {1.0f};
+  if (material->occlusion) {
+    occlusion = glm::mix(1.0f, material->occlusion->sample(u, v).r, material->occlusion_strength);
+  }
+
+  // -- Emissive Texture --
+
+  auto emissive {material->emissive_factor};
+  if (material->emissive) {
+    emissive *= glm::vec3 {material->emissive->sample(u, v)};
+  }
+
+  // -- Metallic & Roughness Texture --
+
+  auto metallic {material->metallic_factor};
+  auto roughness {material->roughness_factor};
+  if (material->metallic_roughness) {
+    const auto sampled {material->metallic_roughness->sample(u, v)};
+    metallic *= sampled.b;
+    roughness *= sampled.g;
+  }
+
+  // -- Shading Context --
+
+  const auto position {f0 * triangle.v0.position_world + f1 * triangle.v1.position_world + f2 * triangle.v2.position_world};
+
+  return shading::ShadingContext {
+      .position = position,
+      .normal = normal,
+      .albedo = albedo,
+      .emissive = emissive,
+      .metallic = metallic,
+      .roughness = roughness,
+      .occlusion = occlusion,
+  };
 }
 
 } // namespace
 
-Rasterizer::Rasterizer(u32 width, u32 height, u32 threads, u32 tile_size)
-    : tile_size_ {tile_size}, depth_ {width, height}, bins_ {width, height, tile_size}, threads_ {threads} {}
+template <shading::Shader ShaderType>
+Rasterizer<ShaderType>::Rasterizer(ShaderType shader, u32 width, u32 height, u32 threads, u32 tile_size)
+    : shader_ {shader}, tile_size_ {tile_size}, depth_ {width, height}, bins_ {width, height, tile_size}, threads_ {threads} {}
 
-auto Rasterizer::rasterize(buffer::FramebufferView<u32> output, const model::Model& model, const model::Lighting& lighting, const Camera& camera) -> void {
+template <shading::Shader ShaderType>
+auto Rasterizer<ShaderType>::rasterize(buffer::FramebufferView<u32> output, const model::Model& model, const model::Lighting& lighting, const Camera& camera)
+    -> void {
   bins_.reset();
   triangles_.reset();
   threads_.reset();
@@ -330,7 +244,8 @@ auto Rasterizer::rasterize(buffer::FramebufferView<u32> output, const model::Mod
   rasterize_tiles(output, lighting, camera.position());
 }
 
-auto Rasterizer::process_triangles(const model::Model& model, const glm::mat4& view, const glm::mat4& projection) -> void {
+template <shading::Shader ShaderType>
+auto Rasterizer<ShaderType>::process_triangles(const model::Model& model, const glm::mat4& view, const glm::mat4& projection) -> void {
   const auto depth {depth_.view()};
   const auto width {depth.width()};
   const auto height {depth.height()};
@@ -460,7 +375,8 @@ auto Rasterizer::process_triangles(const model::Model& model, const glm::mat4& v
   threads_.sync();
 }
 
-auto Rasterizer::bin_triangles() -> void {
+template <shading::Shader ShaderType>
+auto Rasterizer<ShaderType>::bin_triangles() -> void {
   const auto triangles_total {triangles_.size()};
   const auto triangles_per_thread {triangles_total / threads_.capacity()};
   const auto remainder {triangles_total % threads_.capacity()};
@@ -520,7 +436,8 @@ auto Rasterizer::bin_triangles() -> void {
   threads_.sync();
 }
 
-auto Rasterizer::rasterize_tiles(buffer::FramebufferView<u32> output, const model::Lighting& lighting, const glm::vec3& camera_position) -> void {
+template <shading::Shader ShaderType>
+auto Rasterizer<ShaderType>::rasterize_tiles(buffer::FramebufferView<u32> output, const model::Lighting& lighting, glm::vec3 camera_position) -> void {
   const auto tiles_x {bins_.tiles_x()};
   const auto tiles_y {bins_.tiles_y()};
   const auto stride {threads_.capacity()};
@@ -548,5 +465,63 @@ auto Rasterizer::rasterize_tiles(buffer::FramebufferView<u32> output, const mode
   threads_.notify();
   threads_.sync();
 }
+
+template <shading::Shader ShaderType>
+auto Rasterizer<ShaderType>::rasterize_triangle(buffer::FramebufferView<u32> output, buffer::FramebufferView<f32> depth, const Triangle& triangle,
+                                                const Tile& tile, const model::Lighting& lighting, glm::vec3 camera_position) -> void {
+  // Calculate intersection between tile coordinates and screen extent of the triangle
+  const auto x_min {std::max(triangle.min.x, tile.min.x)};
+  const auto x_max {std::min(triangle.max.x, tile.max.x)};
+  const auto y_min {std::max(triangle.min.y, tile.min.y)};
+  const auto y_max {std::min(triangle.max.y, tile.max.y)};
+
+  const auto E0 {triangle.v0.edge};
+  const auto E1 {triangle.v1.edge};
+  const auto E2 {triangle.v2.edge};
+
+  const glm::vec3 p {(static_cast<f32>(x_min) + 0.5f), (static_cast<f32>(y_min) + 0.5f), 1.0f};
+  auto e0_start {glm::dot(E0, p)};
+  auto e1_start {glm::dot(E1, p)};
+  auto e2_start {glm::dot(E2, p)};
+
+  for (auto y {y_min}; y < y_max; ++y) {
+    auto e0 {e0_start};
+    auto e1 {e1_start};
+    auto e2 {e2_start};
+
+    for (auto x {x_min}; x < x_max; ++x) {
+      if (e0 >= 0 && e1 >= 0 && e2 >= 0) {
+        // Coefficients for perspective-correct interpolation
+        const auto r {1.0f / (e0 + e1 + e2)};
+        const auto f0 {r * e0};
+        const auto f1 {r * e1};
+        const auto f2 {r * e2};
+
+        if (auto z {f0 * triangle.v0.position.z + f1 * triangle.v1.position.z + f2 * triangle.v2.position.z}; z < depth.at(x, y)) {
+          const auto u {f0 * triangle.v0.uv.s + f1 * triangle.v1.uv.s + f2 * triangle.v2.uv.s};
+          const auto v {f0 * triangle.v0.uv.t + f1 * triangle.v1.uv.t + f2 * triangle.v2.uv.t};
+
+          if (const auto context {prepare_shading_context(triangle, f0, f1, f2, u, v)}) {
+            const auto V {glm::normalize(camera_position - context.value().position)};
+            output.at(x, y) = linear_to_srgb(shader_(context.value(), lighting, V));
+            depth.at(x, y) = z;
+          }
+        }
+      }
+
+      e0 += E0.x;
+      e1 += E1.x;
+      e2 += E2.x;
+    }
+
+    e0_start += E0.y;
+    e1_start += E1.y;
+    e2_start += E2.y;
+  }
+}
+
+// -- Explicit Instantiations --
+
+template class Rasterizer<shading::BlinnPhongShader>;
 
 } // namespace rasterizer::rasterization

@@ -8,12 +8,14 @@
 #include "platform/window.hpp"
 #include "rasterization/camera.hpp"
 #include "rasterization/rasterizer.hpp"
+#include "rasterization/shading.hpp"
 #include "utils/cli.hpp"
 
 using namespace rasterizer::utils;
 using namespace rasterizer::model;
 using namespace rasterizer::platform;
 using namespace rasterizer::rasterization;
+using namespace rasterizer::shading;
 
 namespace {
 
@@ -85,7 +87,7 @@ auto main(i32 argc, c8* argv[]) -> int {
   lighting.hemispherical.sky = SKY_COLOR;
 
   auto window {Window {width, height, std::string(WINDOW_TITLE)}};
-  auto rasterizer {Rasterizer {width, height, threads, tile_size}};
+  auto rasterizer {Rasterizer<rasterizer::shading::BlinnPhongShader> {{}, width, height, threads, tile_size}};
   auto camera {Camera {width, height, {position_x, position_y, position_z}}};
 
   if (info) {
