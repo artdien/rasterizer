@@ -9,12 +9,12 @@ namespace rasterizer::rasterization {
 
 namespace {
 
-constexpr auto WORLD_UP {glm::vec3 {0.0f, 1.0f, 0.0f}}; // glTF specification assumes positive Y-axis as world up vector
-constexpr auto VERTICAL_FIELD_OF_VIEW {60.0f};          // in degrees
-constexpr auto NEAR_PLANE {0.1f};                       // in world units
-constexpr auto FAR_PLANE {100.0f};                      // in world units
-constexpr auto MOVEMENT_SPEED {3.0f};                   // world units per second
-constexpr auto ROTATION_SPEED {45.0f};                  // degrees per second
+const auto WORLD_UP {glm::vec3 {0.0f, 1.0f, 0.0f}}; // glTF specification assumes positive Y-axis as world up vector
+constexpr auto VERTICAL_FIELD_OF_VIEW {60.0f};      // in degrees
+constexpr auto NEAR_PLANE {0.1f};                   // in world units
+constexpr auto FAR_PLANE {100.0f};                  // in world units
+constexpr auto MOVEMENT_SPEED {3.0f};               // world units per second
+constexpr auto ROTATION_SPEED {45.0f};              // degrees per second
 
 } // namespace
 

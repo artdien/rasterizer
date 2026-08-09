@@ -1,7 +1,6 @@
 #pragma once
 
 #include <atomic>
-#include <new>
 #include <vector>
 
 #include <glm/vec2.hpp>
@@ -14,25 +13,23 @@
 namespace rasterizer::rasterization {
 
 struct Vertex {
-  alignas(16) glm::vec4 position;
-  alignas(16) glm::vec3 position_world;
-  alignas(16) glm::vec3 normal;
-  alignas(16) glm::vec4 tangent;
-  alignas(16) glm::vec3 edge;
-  alignas(8) glm::vec2 uv;
+  glm::vec4 position;
+  glm::vec3 position_world;
+  glm::vec3 normal;
+  glm::vec4 tangent;
+  glm::vec3 edge;
+  glm::vec2 uv;
 };
 
-static_assert(alignof(Vertex) == 16);
-static_assert(sizeof(Vertex) == 96);
+struct Triangle {
+  Vertex v0;
+  Vertex v1;
+  Vertex v2;
+  glm::uvec2 min;
+  glm::uvec2 max;
 
-struct alignas(std::hardware_constructive_interference_size) Triangle {
-  Vertex v0, v1, v2;
-  glm::uvec2 min, max;
   const model::Material* material;
 };
-
-static_assert(alignof(Triangle) >= 64);
-static_assert(sizeof(Triangle) == 320);
 
 class TrianglePool {
 public:

@@ -29,8 +29,8 @@ const auto MAX_THREADS {
         : 1u                                                     //
 };
 
-constexpr auto GROUND_COLOR {glm::vec3 {0.2f, 0.2f, 0.2f}};
-constexpr auto SKY_COLOR {glm::vec3 {0.2f, 0.5f, 0.8f}};
+const auto GROUND_COLOR {glm::vec3 {0.2f, 0.2f, 0.2f}};
+const auto SKY_COLOR {glm::vec3 {0.2f, 0.5f, 0.8f}};
 
 auto process_input(Window* window, Camera* camera, const KeyboardInput& keyboard, f32 dt) -> void {
   if (keyboard.key == "esc") {

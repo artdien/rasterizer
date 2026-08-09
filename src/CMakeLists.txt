@@ -25,6 +25,7 @@ target_compile_definitions(
   PRIVATE
     FENSTER_HEADER
     GLM_ENABLE_EXPERIMENTAL
+    GLM_FORCE_INLINE
 )
 target_sources(
   rasterizer
@@ -44,3 +45,12 @@ target_sources(
     utils/cli.cpp
     main.cpp
 )
+
+if(USE_SIMD)
+  include(${CMAKE_SOURCE_DIR}/cmake/simd.cmake)
+  target_link_libraries(
+    rasterizer
+    PRIVATE
+      simd
+  )
+endif()

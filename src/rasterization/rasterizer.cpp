@@ -12,8 +12,8 @@ namespace rasterizer::rasterization {
 
 namespace {
 
-constexpr auto WORLD_UP {glm::vec3 {0.0f, 1.0f, 0.0f}}; // glTF specification assumes positive Y-axis as world up vector
-constexpr auto BASE_REFLECTIVITY {0.04f};               // commonly used base reflectivity for dielectrics
+const auto WORLD_UP {glm::vec3 {0.0f, 1.0f, 0.0f}}; // glTF specification assumes positive Y-axis as world up vector
+constexpr auto BASE_REFLECTIVITY {0.04f};           // commonly used base reflectivity for dielectrics
 
 struct Extent {
   glm::vec2 min;
