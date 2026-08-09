@@ -280,10 +280,10 @@ auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::Framebuffer
 
           for (const auto& point : lighting.points) {
             const auto light {point.position - position};
-            auto distance {glm::length(light)};
+            const auto distance_squared {glm::dot(light, light)};
 
-            if (distance < point.range) {
-              distance = glm::max(0.01f, distance);
+            if (distance_squared < point.range * point.range) {
+              const auto distance {glm::max(0.01f, glm::sqrt(distance_squared))};
 
               const auto L_p {light / distance};
               const auto H_p {glm::normalize(L_p + V)};
