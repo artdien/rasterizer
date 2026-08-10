@@ -36,8 +36,6 @@ To build this project, you will need:
 - vcpkg
 - git
 
-Currently, only Linux is supported.
-
 The default build settings use Clang as the C++ compiler and Ninja as the build tool. However, this can be changed either by adapting `CMakePresets.json` or creating a user-specific `CMakeUserPresets.json`. A `USE_SIMD` toggle (default is ON) enables AVX2 intrinsics for vectorized math operations via GLM force-intrinsics mode.
 
 ### Building and Running

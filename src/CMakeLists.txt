@@ -1,7 +1,6 @@
 find_package(fastgltf CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 find_package(glm CONFIG REQUIRED)
-find_package(X11 REQUIRED)
 
 find_path(FENSTER_INCLUDE_DIRS "fenster.h")
 
@@ -11,7 +10,6 @@ target_link_libraries(
   PRIVATE
     fastgltf::fastgltf
     glm::glm
-    X11::X11
 )
 target_include_directories(
   rasterizer
@@ -54,3 +52,15 @@ if(USE_SIMD)
       simd
   )
 endif()
+
+# Depending on the operating system, fenster requires linking additional libraries
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  find_package(X11 REQUIRED)
+  target_link_libraries(rasterizer PRIVATE X11::X11)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  # no find_package here, should be already on the linker search path under Windows
+  target_link_libraries(rasterizer PRIVATE gdi32)
+else()
+  message(FATAL_ERROR "Building on ${CMAKE_SYSTEM_NAME} is not supported")
+endif()
+
