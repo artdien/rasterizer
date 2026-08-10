@@ -48,10 +48,10 @@ auto Texture::sample(f32 u, f32 v) const -> glm::vec4 {
     return {0.0f, 0.0f, 0.0f, 0.0f};
   }
 
-  if (u < 0.0f || u > 1.0f) {
+  if (u < 0.0f || u > 1.0f) [[unlikely]] {
     u = wrap_value(u, wrap_s);
   }
-  if (v < 0.0f || v > 1.0f) {
+  if (v < 0.0f || v > 1.0f) [[unlikely]] {
     v = wrap_value(v, wrap_t);
   }
 
