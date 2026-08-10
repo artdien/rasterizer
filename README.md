@@ -10,7 +10,7 @@ Note: The model was modified for the demonstration to include directional lighth
 
 ## Overview
 
-This project implements the steps typically performed by the graphics pipeline on the GPU entirely on the CPU: from geometry transformations through culling and clipping tests, to rasterization and shading. Compared to traditional scanline-based rasterizers that operate in screen-space, this rasterizer operates in homogeneous coordinates. This avoids costly triangle clipping (i.e. actual polygon splitting, not the tests), a technique discussed in the paper "Triangle Scan Conversion using 2D Homogeneous Coordinates by Marc Olano and Trey Greer.
+This project implements the steps typically performed by the graphics pipeline on the GPU entirely on the CPU: from geometry transformations through culling and clipping tests, to rasterization and shading. Compared to traditional scanline-based rasterizers that operate in screen-space, this rasterizer operates in homogeneous coordinates. This avoids costly triangle clipping (i.e. actual polygon splitting, not the tests), a technique discussed in the paper "Triangle Scan Conversion using 2D Homogeneous Coordinates" by Marc Olano and Trey Greer.
 
 After rasterization, shading is applied using either the classic Blinn-Phong model or the physically-based Cook-Torrance shading. Both consume PBR materials from the loaded glTF file, though Blinn-Phong does not fully leverage the physically-based material properties.
 
