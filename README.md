@@ -6,7 +6,7 @@ A multi-threaded, tiled-based software rasterizer written in C++, rendering glTF
   <img src="docs/demo.gif" />
 </p>
 
-Note: The model was modified for the demonstration to include directional lighthing as well as point lights, which are both not present in the original file.
+Note: The model was modified for the demonstration to include directional lighting as well as point lights, neither of which is present in the original file.
 
 ## Overview
 
