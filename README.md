@@ -6,6 +6,8 @@ A multi-threaded, tiled-based software rasterizer written in C++, rendering glTF
   <img src="docs/demo.gif" />
 </p>
 
+Note: The model was modified for the demonstration to include directional lighthing as well as point lights, which are both not present in the original file.
+
 ## Overview
 
 This project implements the steps typically performed by the graphics pipeline on the GPU entirely on the CPU: from geometry transformations through culling and clipping tests, to rasterization and shading. Compared to traditional scanline-based rasterizers that operate in screen-space, this rasterizer operates in homogeneous coordinates. This avoids costly triangle clipping (i.e. actual polygon splitting, not the tests), a technique discussed in the paper "Triangle Scan Conversion using 2D Homogeneous Coordinates by Marc Olano and Trey Greer.
