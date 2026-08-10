@@ -240,8 +240,9 @@ auto prepare_shading_context(const Triangle& triangle, f32 f0, f32 f1, f32 f2, f
 } // namespace
 
 template <shading::Shader ShaderType>
-Rasterizer<ShaderType>::Rasterizer(ShaderType shader, u32 width, u32 height, u32 threads, u32 tile_size)
-    : shader_ {shader}, tile_size_ {tile_size}, bins_ {width, height, tile_size}, threads_ {threads}, current_rotation_ {0.0f}, depth_ {width, height} {}
+Rasterizer<ShaderType>::Rasterizer(ShaderType shader, u32 width, u32 height, u32 threads, u32 tile_size, bool gradient_background)
+    : shader_ {shader}, tile_size_ {tile_size}, bins_ {width, height, tile_size}, threads_ {threads}, current_rotation_ {0.0f}, depth_ {width, height},
+      gradient_background_ {gradient_background} {}
 
 template <shading::Shader ShaderType>
 auto Rasterizer<ShaderType>::rasterize(buffer::FramebufferView<u32> output, const model::Model& model, const model::Lighting& lighting, const Camera& camera)
@@ -250,7 +251,12 @@ auto Rasterizer<ShaderType>::rasterize(buffer::FramebufferView<u32> output, cons
   triangles_.reset();
   threads_.reset();
 
-  fill_gradient_background(output, lighting);
+  if (gradient_background_) {
+    fill_gradient_background(output, lighting);
+  } else {
+    output.clear(0u);
+  }
+
   depth_.view().clear(std::numeric_limits<f32>::infinity());
 
   process_triangles(model, camera.view_matrix(), camera.projection_matrix());

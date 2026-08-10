@@ -80,6 +80,7 @@ auto main(i32 argc, c8* argv[]) -> int {
   const auto position_y {parse_cli_argument_f32(argc, argv, "-y").value_or(0.0f)};
   const auto position_z {parse_cli_argument_f32(argc, argv, "-z").value_or(0.0f)};
   const auto shading {parse_cli_argument_str(argc, argv, "-shading").value_or(COOK_TORRANCE)};
+  const auto gradient_background {parse_cli_flag(argc, argv, "-gradient")};
   const auto info {parse_cli_flag(argc, argv, "-info")};
 
   if (filepath == "") {
@@ -106,9 +107,9 @@ auto main(i32 argc, c8* argv[]) -> int {
   }
 
   if (shading_model == COOK_TORRANCE) {
-    rasterizer = std::make_unique<Rasterizer<CookTorranceShader>>(CookTorranceShader {}, width, height, threads, tile_size);
+    rasterizer = std::make_unique<Rasterizer<CookTorranceShader>>(CookTorranceShader {}, width, height, threads, tile_size, gradient_background);
   } else if (shading_model == BLINN_PHONG) {
-    rasterizer = std::make_unique<Rasterizer<BlinnPhongShader>>(BlinnPhongShader {}, width, height, threads, tile_size);
+    rasterizer = std::make_unique<Rasterizer<BlinnPhongShader>>(BlinnPhongShader {}, width, height, threads, tile_size, gradient_background);
   }
 
   if (info) {
@@ -118,6 +119,7 @@ auto main(i32 argc, c8* argv[]) -> int {
     std::println("  Threads: {}", threads);
     std::println("  Tile Size: {}", tile_size);
     std::println("  Shading Model: {}", shading_model);
+    std::println("  Gradient Background: {}", gradient_background);
     std::println("  Initial Camera Position: ({:.2f}, {:.2f}, {:.2f})", position_x, position_y, position_z);
     std::print("\n");
 
