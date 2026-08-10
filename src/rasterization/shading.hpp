@@ -112,9 +112,13 @@ struct CookTorranceShader {
         return;
       }
 
+      const auto NdotV {glm::dot(N, V)};
+      if (NdotV <= 0.0f) {
+        return;
+      }
+
       const auto H {glm::normalize(L + V)};
       const auto NdotH {glm::dot(N, H)};
-      const auto NdotV {glm::max(0.0f, glm::dot(N, V))};
       const auto NdotV_abs {glm::abs(NdotV)};
 
       // -- Normal Distribution Function: Trowbridge-Reitz GGX --
