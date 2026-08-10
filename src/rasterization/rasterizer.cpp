@@ -149,6 +149,15 @@ auto overlapping_tiles(const Triangle& triangle, u32 tile_size) -> Tile {
   };
 }
 
+auto fill_gradient_background(buffer::FramebufferView<u32> output, const model::Lighting& lighting) -> void {
+  for (auto y {0u}; y < output.height(); ++y) {
+    const auto t {static_cast<f32>(y) / output.height()};
+    const auto color {glm::mix(lighting.hemispherical.ground, lighting.hemispherical.sky, t)};
+
+    std::fill_n(&output.at(0, y), output.width(), linear_to_srgb(color));
+  }
+}
+
 auto prepare_shading_context(const Triangle& triangle, f32 f0, f32 f1, f32 f2, f32 u, f32 v) -> std::optional<shading::ShadingContext> {
   const auto material {triangle.material};
 
@@ -236,7 +245,7 @@ auto Rasterizer<ShaderType>::rasterize(buffer::FramebufferView<u32> output, cons
   triangles_.reset();
   threads_.reset();
 
-  output.clear(0u);
+  fill_gradient_background(output, lighting);
   depth_.view().clear(std::numeric_limits<f32>::infinity());
 
   process_triangles(model, camera.view_matrix(), camera.projection_matrix());
