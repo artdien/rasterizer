@@ -54,8 +54,9 @@ struct BlinnPhongShader {
     // -- Directional Light --
 
     const auto H_d {glm::normalize(L_d + V)};
-    result += glm::max(0.0f, glm::dot(context.normal, L_d)) * diffuse_color * lighting.directional.color;
-    result += glm::pow(glm::max(0.0f, glm::dot(context.normal, H_d)), specular_exponent) * specular_color * lighting.directional.color;
+    const auto directional_color {lighting.directional.color * lighting.directional.intensity};
+    result += glm::max(0.0f, glm::dot(context.normal, L_d)) * diffuse_color * directional_color;
+    result += glm::pow(glm::max(0.0f, glm::dot(context.normal, H_d)), specular_exponent) * specular_color * directional_color;
 
     // -- Point Lights --
 
@@ -72,8 +73,9 @@ struct BlinnPhongShader {
         const auto ratio {distance / point.range};
         const auto attenuation {glm::max(glm::min(1.0f - ratio * ratio * ratio * ratio, 1.0f), 0.0f) / (distance * distance)};
 
-        result += glm::max(0.0f, glm::dot(context.normal, L_p)) * diffuse_color * point.color * attenuation;
-        result += glm::pow(glm::max(0.0f, glm::dot(context.normal, H_p)), specular_exponent) * specular_color * point.color * attenuation;
+        const auto point_color {point.color * point.intensity};
+        result += glm::max(0.0f, glm::dot(context.normal, L_p)) * diffuse_color * point_color * attenuation;
+        result += glm::pow(glm::max(0.0f, glm::dot(context.normal, H_p)), specular_exponent) * specular_color * point_color * attenuation;
       }
     }
 
@@ -106,7 +108,7 @@ struct CookTorranceShader {
     const auto weight {glm::dot(N, constants::WORLD_UP) * 0.5f + 0.5f};
     result += glm::mix(lighting.hemispherical.ground, lighting.hemispherical.sky, weight) * context.albedo * context.occlusion * (1.0f - metallic);
 
-    const auto evaluate_light = [&, F0](glm::vec3 L, glm::vec3 light_color, f32 attenuation) {
+    const auto evaluate_light = [&, F0](glm::vec3 L, glm::vec3 light_color, f32 light_intensity, f32 attenuation) {
       const auto NdotL {glm::dot(N, L)};
       if (NdotL <= 0.0f) {
         return;
@@ -146,13 +148,13 @@ struct CookTorranceShader {
       // -- Specular Cook-Torrance --
 
       const auto specular {(D * G * F) / glm::max(4.0f * NdotV_abs * NdotL, 0.001f)};
-      result += NdotL * light_color * (diffuse * (glm::vec3 {1.0f} - F) + specular) * attenuation;
+      result += NdotL * light_color * light_intensity * (diffuse * (glm::vec3 {1.0f} - F) + specular) * attenuation;
     };
 
     // -- Directional Light --
 
     const auto L_d {-lighting.directional.direction};
-    evaluate_light(L_d, lighting.directional.color, 1.0f);
+    evaluate_light(L_d, lighting.directional.color, lighting.directional.intensity, 1.0f);
 
     // -- Point Lights --
 
@@ -167,7 +169,7 @@ struct CookTorranceShader {
         const auto ratio {distance / point.range};
         const auto attenuation {glm::max(glm::min(1.0f - ratio * ratio * ratio * ratio, 1.0f), 0.0f) / (distance * distance)};
 
-        evaluate_light(L_p, point.color, attenuation);
+        evaluate_light(L_p, point.color, point.intensity, attenuation);
       }
     }
 
