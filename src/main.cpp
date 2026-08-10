@@ -87,7 +87,7 @@ auto main(i32 argc, c8* argv[]) -> int {
   lighting.hemispherical.sky = SKY_COLOR;
 
   auto window {Window {width, height, std::string(WINDOW_TITLE)}};
-  auto rasterizer {Rasterizer<rasterizer::shading::BlinnPhongShader> {{}, width, height, threads, tile_size}};
+  auto rasterizer {Rasterizer<rasterizer::shading::CookTorranceShader> {{}, width, height, threads, tile_size}};
   auto camera {Camera {width, height, {position_x, position_y, position_z}}};
 
   if (info) {

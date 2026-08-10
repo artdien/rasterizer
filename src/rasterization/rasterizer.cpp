@@ -523,5 +523,6 @@ auto Rasterizer<ShaderType>::rasterize_triangle(buffer::FramebufferView<u32> out
 // -- Explicit Instantiations --
 
 template class Rasterizer<shading::BlinnPhongShader>;
+template class Rasterizer<shading::CookTorranceShader>;
 
 } // namespace rasterizer::rasterization
