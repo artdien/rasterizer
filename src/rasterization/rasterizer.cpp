@@ -46,7 +46,7 @@ auto viewport_matrix(u32 width, u32 height) -> glm::mat4 {
   );
 }
 
-auto vertex_matrix(const glm::vec4& p1, const glm::vec4& p2, const glm::vec4& p3) -> glm::mat3 {
+auto vertex_matrix(glm::vec4 p1, glm::vec4 p2, glm::vec4 p3) -> glm::mat3 {
   // This is actually the adjugate of the vertex matrix.
   // It is used for performance reasons to avoid computing the inverse of the vertex matrix.
   return glm::rowMajor3(glm::vec3 {p2.y * p3.w - p2.w * p3.y, p1.w * p3.y - p1.y * p3.w, p1.y * p2.w - p1.w * p2.y}, //
@@ -55,7 +55,7 @@ auto vertex_matrix(const glm::vec4& p1, const glm::vec4& p2, const glm::vec4& p3
   );
 }
 
-auto clip(const glm::vec4& p0, const glm::vec4& p1, const glm::vec4& p2) -> std::optional<Extent> {
+auto clip(glm::vec4 p0, glm::vec4 p1, glm::vec4 p2) -> std::optional<Extent> {
   auto x_min {1.0f}, x_max {-1.0f};
   auto y_min {1.0f}, y_max {-1.0f};
   auto visibility_count {u8 {0u}};
@@ -492,8 +492,8 @@ auto Rasterizer<ShaderType>::rasterize_tiles(buffer::FramebufferView<u32> output
 }
 
 template <shading::Shader ShaderType>
-auto Rasterizer<ShaderType>::rasterize_triangle(buffer::FramebufferView<u32> output, buffer::FramebufferView<f32> depth, const Triangle& triangle,
-                                                const Tile& tile, const model::Lighting& lighting, glm::vec3 camera_position) -> void {
+auto Rasterizer<ShaderType>::rasterize_triangle(buffer::FramebufferView<u32> output, buffer::FramebufferView<f32> depth, const Triangle& triangle, Tile tile,
+                                                const model::Lighting& lighting, glm::vec3 camera_position) -> void {
   // Calculate intersection between tile coordinates and screen extent of the triangle
   const auto x_min {std::max(triangle.min.x, tile.min.x)};
   const auto x_max {std::min(triangle.max.x, tile.max.x)};

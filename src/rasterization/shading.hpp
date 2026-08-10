@@ -86,7 +86,7 @@ struct BlinnPhongShader {
 static_assert(Shader<BlinnPhongShader>);
 
 struct CookTorranceShader {
-  auto operator()(const ShadingContext& context, const model::Lighting& lighting, const glm::vec3& V) const -> glm::vec3 {
+  auto operator()(const ShadingContext& context, const model::Lighting& lighting, glm::vec3 V) const -> glm::vec3 {
     auto result {glm::vec3 {0.0f}};
 
     const auto N {context.normal};

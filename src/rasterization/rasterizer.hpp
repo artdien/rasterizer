@@ -75,7 +75,7 @@ private:
   auto process_triangles(const model::Model& model, const glm::mat4& view, const glm::mat4& projection) -> void;
   auto bin_triangles() -> void;
   auto rasterize_tiles(buffer::FramebufferView<u32> output, const model::Lighting& lighting, glm::vec3 camera_position) -> void;
-  auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::FramebufferView<f32> depth, const Triangle& triangle, const Tile& tile,
+  auto rasterize_triangle(buffer::FramebufferView<u32> output, buffer::FramebufferView<f32> depth, const Triangle& triangle, Tile tile,
                           const model::Lighting& lighting, glm::vec3 camera_position) -> void;
 };
 
