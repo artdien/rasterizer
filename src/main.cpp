@@ -38,7 +38,9 @@ const auto MAX_THREADS {
 const auto GROUND_COLOR {glm::vec3 {0.2f, 0.2f, 0.2f}};
 const auto SKY_COLOR {glm::vec3 {0.2f, 0.5f, 0.8f}};
 
-auto process_input(Window* window, Camera* camera, const KeyboardInput& keyboard, f32 dt) -> void {
+using RasterizerVariant = std::variant<std::unique_ptr<Rasterizer<CookTorranceShader>>, std::unique_ptr<Rasterizer<BlinnPhongShader>>>;
+
+auto process_input(Window* window, Camera* camera, RasterizerVariant* rasterizer, const KeyboardInput& keyboard, f32 dt) -> void {
   if (keyboard.key == "esc") {
     window->close();
   } else if (keyboard.key == "w") {
@@ -61,6 +63,8 @@ auto process_input(Window* window, Camera* camera, const KeyboardInput& keyboard
     camera->look_up(dt);
   } else if (keyboard.key == "down") {
     camera->look_down(dt);
+  } else if (keyboard.key == "space") {
+    std::visit([&](auto& r) { r->rotate_model(dt); }, *rasterizer);
   }
 }
 
@@ -93,7 +97,7 @@ auto main(i32 argc, c8* argv[]) -> int {
 
   auto window {Window {width, height, std::string(WINDOW_TITLE)}};
   auto camera {Camera {width, height, {position_x, position_y, position_z}}};
-  auto rasterizer {std::variant<std::unique_ptr<Rasterizer<CookTorranceShader>>, std::unique_ptr<Rasterizer<BlinnPhongShader>>> {}};
+  auto rasterizer {RasterizerVariant {}};
 
   auto shading_model {std::string {shading}};
   if (shading_model != COOK_TORRANCE && shading_model != BLINN_PHONG) {
@@ -129,11 +133,11 @@ auto main(i32 argc, c8* argv[]) -> int {
   auto last_output_time_ms {0.0};
 
   window.open([&](KeyboardInput keyboard, f64 elapsed_time_ms) {
-    process_input(&window, &camera, keyboard, static_cast<f32>(elapsed_time_ms / 1000.0f));
+    process_input(&window, &camera, &rasterizer, keyboard, static_cast<f32>(elapsed_time_ms / 1000.0f));
 
     lag_ms = std::min(lag_ms + elapsed_time_ms, MAX_LAG_MS);
     while (lag_ms >= UPDATE_TIME_MS) {
-      std::visit([&](auto& rasterizer) { rasterizer->rasterize(window.buffer(), model, lighting, camera); }, rasterizer);
+      std::visit([&](auto& r) { r->rasterize(window.buffer(), model, lighting, camera); }, rasterizer);
       lag_ms -= UPDATE_TIME_MS;
     }
 

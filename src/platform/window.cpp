@@ -33,6 +33,8 @@ auto register_key_press(const fenster& window) {
     add_keyboard_input_event(KeyboardInput {.key = "right"});
   } else if (window.keys[20]) {
     add_keyboard_input_event(KeyboardInput {.key = "left"});
+  } else if (window.keys[32]) {
+    add_keyboard_input_event(KeyboardInput {.key = "space"});
   }
 }
 

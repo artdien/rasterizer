@@ -5,6 +5,7 @@
 #include "buffer/framebuffer.hpp"
 #include "model/lighting.hpp"
 #include "model/model.hpp"
+#include "platform/types.hpp"
 #include "rasterization/bin.hpp"
 #include "rasterization/camera.hpp"
 #include "rasterization/shading.hpp"
@@ -53,17 +54,23 @@ public:
   /// @param camera   Camera object providing position, view matrix, and projection matrix.
   auto rasterize(buffer::FramebufferView<u32> output, const model::Model& model, const model::Lighting& lighting, const Camera& camera) -> void;
 
+  /// @brief Increments the Y-axis rotation of the model.
+  ///
+  /// @param dt Delta time in seconds.
+  auto rotate_model(f32 dt) -> void;
+
 private:
   ShaderType shader_;
 
   u32 tile_size_;
-  buffer::Framebuffer<f32> depth_;
+  std::vector<Tile> tiles_;
 
   BinPool bins_;
   TrianglePool triangles_;
   ThreadPool threads_;
 
-  std::vector<Tile> tiles_;
+  f32 current_rotation_;
+  buffer::Framebuffer<f32> depth_;
 
   auto process_triangles(const model::Model& model, const glm::mat4& view, const glm::mat4& projection) -> void;
   auto bin_triangles() -> void;

@@ -1,10 +1,13 @@
 #include "rasterization/rasterizer.hpp"
 
 #include <algorithm>
+#include <cmath>
+#include <glm/geometric.hpp>
 #include <limits>
 #include <optional>
 #include <ranges>
 
+#include <glm/ext/matrix_transform.hpp>
 #include <glm/gtx/matrix_major_storage.hpp>
 
 #include "model/material.hpp"
@@ -13,6 +16,8 @@
 namespace rasterizer::rasterization {
 
 namespace {
+
+constexpr auto ROTATION_SPEED {45.0f}; // degrees per second
 
 struct Extent {
   glm::vec2 min;
@@ -236,7 +241,7 @@ auto prepare_shading_context(const Triangle& triangle, f32 f0, f32 f1, f32 f2, f
 
 template <shading::Shader ShaderType>
 Rasterizer<ShaderType>::Rasterizer(ShaderType shader, u32 width, u32 height, u32 threads, u32 tile_size)
-    : shader_ {shader}, tile_size_ {tile_size}, depth_ {width, height}, bins_ {width, height, tile_size}, threads_ {threads} {}
+    : shader_ {shader}, tile_size_ {tile_size}, bins_ {width, height, tile_size}, threads_ {threads}, current_rotation_ {0.0f}, depth_ {width, height} {}
 
 template <shading::Shader ShaderType>
 auto Rasterizer<ShaderType>::rasterize(buffer::FramebufferView<u32> output, const model::Model& model, const model::Lighting& lighting, const Camera& camera)
@@ -254,12 +259,18 @@ auto Rasterizer<ShaderType>::rasterize(buffer::FramebufferView<u32> output, cons
 }
 
 template <shading::Shader ShaderType>
+auto Rasterizer<ShaderType>::rotate_model(f32 dt) -> void {
+  current_rotation_ = std::fmod(current_rotation_ + ROTATION_SPEED * dt, 360.0f);
+}
+
+template <shading::Shader ShaderType>
 auto Rasterizer<ShaderType>::process_triangles(const model::Model& model, const glm::mat4& view, const glm::mat4& projection) -> void {
   const auto depth {depth_.view()};
   const auto width {depth.width()};
   const auto height {depth.height()};
 
-  const auto transformation {projection * view};
+  const auto rotation {glm::rotate(glm::mat4 {1.0f}, glm::radians(current_rotation_), glm::vec3 {0.0f, 1.0f, 0.0f})};
+  const auto transformation {projection * view * rotation};
   const auto viewport {viewport_matrix(width, height)};
 
   const auto triangles_total {std::ranges::fold_left(                                   //
@@ -338,27 +349,32 @@ auto Rasterizer<ShaderType>::process_triangles(const model::Model& model, const 
 
                 // -- Add Processed Triangle --
 
+                // Since a rotation around the Y-axis is an orthogonal matrix,
+                // we can simply transform normals and tangents with it because the inverse transpose is the same matrix.
+                const auto transformation_normal {glm::mat3 {rotation}};
+                const auto transformation_tangent {rotation};
+
                 const auto v0 {Vertex {
                     .position = p0,
                     .position_world = p0_world,
-                    .normal = prim->normals[i0],
-                    .tangent = prim->tangents[i0],
+                    .normal = transformation_normal * prim->normals[i0],
+                    .tangent = transformation_tangent * prim->tangents[i0],
                     .edge = M[0],
                     .uv = prim->texcoords[i0],
                 }};
                 const auto v1 {Vertex {
                     .position = p1,
                     .position_world = p1_world,
-                    .normal = prim->normals[i1],
-                    .tangent = prim->tangents[i1],
+                    .normal = transformation_normal * prim->normals[i1],
+                    .tangent = transformation_tangent * prim->tangents[i1],
                     .edge = M[1],
                     .uv = prim->texcoords[i1],
                 }};
                 const auto v2 {Vertex {
                     .position = p2,
                     .position_world = p2_world,
-                    .normal = prim->normals[i2],
-                    .tangent = prim->tangents[i2],
+                    .normal = transformation_normal * prim->normals[i2],
+                    .tangent = transformation_tangent * prim->tangents[i2],
                     .edge = M[2],
                     .uv = prim->texcoords[i2],
                 }};
