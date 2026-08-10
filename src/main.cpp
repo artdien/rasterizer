@@ -1,7 +1,9 @@
 #include <iostream>
+#include <memory>
 #include <print>
 #include <string_view>
 #include <thread>
+#include <variant>
 
 #include "model/loading.hpp"
 #include "platform/types.hpp"
@@ -23,6 +25,8 @@ constexpr auto WINDOW_TITLE {std::string_view {"Software Rasterizer"}};
 constexpr auto UPDATE_TIME_MS {1000.0 / 30.0};
 constexpr auto MAX_LAG_MS {100.0};
 constexpr auto OUTPUT_INTERVAL_MS {1000.0};
+constexpr auto BLINN_PHONG {std::string_view {"blinn-phong"}};
+constexpr auto COOK_TORRANCE {std::string_view {"cook-torrance"}};
 
 // Leave one core free for the OS to prevent freezes or lags
 const auto MAX_THREADS {
@@ -71,6 +75,7 @@ auto main(i32 argc, c8* argv[]) -> int {
   const auto position_x {parse_cli_argument_f32(argc, argv, "-x").value_or(0.0f)};
   const auto position_y {parse_cli_argument_f32(argc, argv, "-y").value_or(0.0f)};
   const auto position_z {parse_cli_argument_f32(argc, argv, "-z").value_or(0.0f)};
+  const auto shading {parse_cli_argument_str(argc, argv, "-shading").value_or(COOK_TORRANCE)};
   const auto info {parse_cli_flag(argc, argv, "-info")};
 
   if (filepath == "") {
@@ -87,8 +92,20 @@ auto main(i32 argc, c8* argv[]) -> int {
   lighting.hemispherical.sky = SKY_COLOR;
 
   auto window {Window {width, height, std::string(WINDOW_TITLE)}};
-  auto rasterizer {Rasterizer<rasterizer::shading::CookTorranceShader> {{}, width, height, threads, tile_size}};
   auto camera {Camera {width, height, {position_x, position_y, position_z}}};
+  auto rasterizer {std::variant<std::unique_ptr<Rasterizer<CookTorranceShader>>, std::unique_ptr<Rasterizer<BlinnPhongShader>>> {}};
+
+  auto shading_model {std::string {shading}};
+  if (shading_model != COOK_TORRANCE && shading_model != BLINN_PHONG) {
+    std::println("Unknown shading model '{}', falling back to default: '{}'", shading_model, COOK_TORRANCE);
+    shading_model = COOK_TORRANCE;
+  }
+
+  if (shading_model == COOK_TORRANCE) {
+    rasterizer = std::make_unique<Rasterizer<CookTorranceShader>>(CookTorranceShader {}, width, height, threads, tile_size);
+  } else if (shading_model == BLINN_PHONG) {
+    rasterizer = std::make_unique<Rasterizer<BlinnPhongShader>>(BlinnPhongShader {}, width, height, threads, tile_size);
+  }
 
   if (info) {
     std::println("PARAMETERS");
@@ -96,6 +113,7 @@ auto main(i32 argc, c8* argv[]) -> int {
     std::println("  Height: {}", height);
     std::println("  Threads: {}", threads);
     std::println("  Tile Size: {}", tile_size);
+    std::println("  Shading Model: {}", shading_model);
     std::println("  Initial Camera Position: ({:.2f}, {:.2f}, {:.2f})", position_x, position_y, position_z);
     std::print("\n");
 
@@ -115,7 +133,7 @@ auto main(i32 argc, c8* argv[]) -> int {
 
     lag_ms = std::min(lag_ms + elapsed_time_ms, MAX_LAG_MS);
     while (lag_ms >= UPDATE_TIME_MS) {
-      rasterizer.rasterize(window.buffer(), model, lighting, camera);
+      std::visit([&](auto& rasterizer) { rasterizer->rasterize(window.buffer(), model, lighting, camera); }, rasterizer);
       lag_ms -= UPDATE_TIME_MS;
     }
 
