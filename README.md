@@ -93,7 +93,7 @@ This project uses the following dependencies, managed via vcpkg (except `fenster
 * [fastgltf](https://github.com/spnda/fastgltf): Used for parsing .gltf/.glb files.
 * [GLM](https://github.com/g-truc/glm): Used for linear algebra and vector mathematics.
 * [stb](https://github.com/nothings/stb): Specifically the image loader is used for loading embedded or external texture images from .glTF/.glb files.
-* [fenster](https://github.com/zserge/fenster): Minimal window library providing raw pixel buffer used for displaying the render output.
+* [fenster](https://github.com/ZeunO8/fenster): Minimal window library providing raw pixel buffer used for displaying the render output.
 
 ## License
 

@@ -2,8 +2,8 @@ include(FetchContent)
 
 FetchContent_Declare(
   fenster
-  GIT_REPOSITORY https://github.com/zserge/fenster
-  GIT_TAG e700581dfb7956dd161aee44fc0cff0663e789a1
+  GIT_REPOSITORY https://github.com/ZeunO8/fenster
+  GIT_TAG f431983c8f91f816cc395b131662d169e41d7fcd
 )
 FetchContent_MakeAvailable(fenster)
 
@@ -17,13 +17,14 @@ target_link_libraries(
   PRIVATE
     fastgltf::fastgltf
     glm::glm
+    fenster
 )
 target_include_directories(
   rasterizer
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${Stb_INCLUDE_DIR}
-    ${fenster_SOURCE_DIR}
+    "${fenster_SOURCE_DIR}/include"
 )
 target_compile_definitions(
   rasterizer
@@ -36,7 +37,6 @@ target_sources(
   rasterizer
   PRIVATE
     buffer/framebuffer.cpp
-    impl/fenster.cpp
     impl/stb.cpp
     model/loading.cpp
     model/material.cpp

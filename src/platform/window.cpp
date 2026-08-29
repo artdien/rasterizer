@@ -1,6 +1,6 @@
 #include "platform/window.hpp"
 
-#include <fenster.h>
+#include <fenster.hpp>
 
 #include <chrono>
 
