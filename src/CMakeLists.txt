@@ -1,8 +1,15 @@
+include(FetchContent)
+
+FetchContent_Declare(
+  fenster
+  GIT_REPOSITORY https://github.com/zserge/fenster
+  GIT_TAG e700581dfb7956dd161aee44fc0cff0663e789a1
+)
+FetchContent_MakeAvailable(fenster)
+
 find_package(fastgltf CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 find_package(glm CONFIG REQUIRED)
-
-find_path(FENSTER_INCLUDE_DIRS "fenster.h")
 
 add_executable(rasterizer)
 target_link_libraries(
@@ -16,7 +23,7 @@ target_include_directories(
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${Stb_INCLUDE_DIR}
-    ${FENSTER_INCLUDE_DIRS}
+    ${fenster_SOURCE_DIR}
 )
 target_compile_definitions(
   rasterizer

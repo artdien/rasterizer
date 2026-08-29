@@ -2,7 +2,6 @@
   "dependencies": [
     "fastgltf",
     "glm",
-    "stb",
-    "fenster"
+    "stb"
   ]
 }

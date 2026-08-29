@@ -88,7 +88,7 @@ The command-line configuration options are:
 
 ## Dependencies
 
-This project uses the following dependencies, managed via vcpkg:
+This project uses the following dependencies, managed via vcpkg (except `fenster`):
 
 * [fastgltf](https://github.com/spnda/fastgltf): Used for parsing .gltf/.glb files.
 * [GLM](https://github.com/g-truc/glm): Used for linear algebra and vector mathematics.
