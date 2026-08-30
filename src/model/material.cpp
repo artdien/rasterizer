@@ -17,8 +17,12 @@ auto wrap_value(f32 value, TextureWrap mode) -> f32 {
       const auto frac {value - floored};
       return static_cast<i32>(floored) % 2 != 0 ? 1.0f - frac : frac;
     }
-    case TextureWrap::CLAMP_TO_EDGE:
+    case TextureWrap::CLAMP_TO_EDGE: {
       return value < 0.0f ? 0.0f : (value > 1.0f ? 1.0f : value);
+    }
+    default: {
+      return 0.0f;
+    }
   }
 }
 

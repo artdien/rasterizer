@@ -171,6 +171,8 @@ auto load_texture(const fastgltf::Asset& asset, const fastgltf::Texture& texture
         return TextureWrap::MIRRORED_REPEAT;
       case fastgltf::Wrap::ClampToEdge:
         return TextureWrap::CLAMP_TO_EDGE;
+      default:
+        return TextureWrap::REPEAT;
     }
   }};
 
