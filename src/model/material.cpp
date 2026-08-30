@@ -28,7 +28,10 @@ auto wrap_value(f32 value, TextureWrap mode) -> f32 {
 
 } // namespace
 
-Texture::Texture() : data_ {nullptr}, width_ {0}, height_ {0}, channels_ {0} {}
+Texture::Texture()
+    : wrap_s {TextureWrap::REPEAT}, wrap_t {TextureWrap::REPEAT}, //
+      data_ {nullptr}, width_ {0}, height_ {0}, channels_ {0},    //
+      scale_u_ {0.0f}, scale_v_ {0.0f} {}
 
 Texture::Texture(uc8* data, ImageDeleter deleter, u32 width, u32 height, u32 channels)
     : wrap_s {TextureWrap::REPEAT}, wrap_t {TextureWrap::REPEAT},                                                         //
