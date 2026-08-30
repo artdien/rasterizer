@@ -122,13 +122,11 @@ auto load_texture(const fastgltf::Asset& asset, const fastgltf::Texture& texture
     auto width {i32 {}};
     auto height {i32 {}};
     auto channels {i32 {}};
+    const auto image {stbi_load_from_memory(data, size, &width, &height, &channels, 4)};
 
     return {
-        stbi_load_from_memory(data, size, &width, &height, &channels, 4),
-        deleter,
-        static_cast<u32>(width),
-        static_cast<u32>(height),
-        4u, // pass desired channels here, not actual channels in data
+        // pass desired channels here (i.e. 4), not actual channels in data
+        image, deleter, static_cast<u32>(width), static_cast<u32>(height), 4u,
     };
   }};
 
